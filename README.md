@@ -27,6 +27,13 @@ computer and gets them onto the drone in one of two ways:
 > arm, dead gimbal), so development has stopped short of the field tests. If
 > you have a working original Anafi and want to carry it on, issues and pull
 > requests are welcome.
+>
+> **Donations welcome.** If you have an original Anafi you no longer use,
+> donating it would let testing continue. A damaged one helps too, if its
+> gimbal and arms are good: it can provide parts to repair the test drone.
+> Please get in touch by [opening an issue](https://github.com/GuiAlDuS/anafi-mission-planner/issues/new)
+> (don't post addresses or other personal details there; we'll move to a
+> private channel).
 
 > [!WARNING]
 > **How a mission climbs and descends.** Every mission takes off and climbs
