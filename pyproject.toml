@@ -1,0 +1,47 @@
+[project]
+name = "anafi-mission-planner"
+version = "0.1.0"
+description = "Photogrammetry mission planner for the original Parrot Anafi"
+requires-python = ">=3.10"
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+readme = "README.md"
+dependencies = [
+    "pyproj>=3.6",
+    "send2trash>=1.8",
+    "shapely>=2.0",
+]
+
+[project.optional-dependencies]
+# Flight control (Olympe): Parrot only ships x86_64 Linux packages. 8.5.0 also
+# needs certifi and its rendering extra at import time without declaring them.
+fly = [
+    "parrot-olympe[rendering]>=8.5; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "certifi; sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "pillow>=10",  # health --gimbal compares two photos
+]
+
+# Your own orthophotos as map layers. rasterio bundles GDAL in its wheels (Python 3.12+,
+# macOS 15+, Windows, Linux); kept optional so the planner itself installs everywhere.
+ortho = [
+    "rio-tiler>=7",
+]
+
+[project.scripts]
+anafi-plan = "planner.__main__:main"
+anafi-drone = "drone.__main__:main"
+anafi-gui = "ui.__main__:main"
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["planner", "drone", "ui"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+out/
+# field data: upload log and plans pulled from the drone
+uploads.json
+battery_checks.json
+health_checks.json
+drone_plans/
+flight_logs/
+freeflight_plans/
+freeflight_runs/
+orthophotos/
+wms_layers.json
+# Parrot manuals (Parrot copyright, kept local, not redistributed)
+drone/manuals/

@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anafi Mission Planner</title>
+<link rel="stylesheet" href="vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="vendor/fonts.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="map" aria-label="Map"></div>
+
+<aside class="panel" aria-label="Mission">
+  <div class="panel-top">
+  <header class="panel-head">
+    <h1>Anafi Mission Planner</h1>
+    <nav class="modes" aria-label="Mode">
+      <a class="mode" href="#plan" data-view="plan">Plan</a>
+      <a class="mode" href="#batteries" data-view="batteries">Batteries</a>
+    </nav>
+  </header>
+  <div id="readout" class="readout is-empty" aria-live="polite">Draw an area to see flight time, photos and batteries.</div>
+  </div>
+
+  <section class="block" aria-labelledby="area-h">
+    <div class="block-head">
+      <h2 id="area-h">Area</h2>
+      <span class="block-actions">
+        <button id="help" class="text-button" type="button" title="Show how to edit the area" hidden>Help</button>
+        <button id="undo" class="text-button" type="button" title="Undo the last change to the area (Ctrl+Z)" hidden>Undo</button>
+        <button id="clear" class="text-button">Clear</button>
+      </span>
+    </div>
+    <div class="tools">
+      <button id="draw" class="tool">Draw area</button>
+      <button id="set-home" class="tool">Set takeoff</button>
+      <label class="tool file">Load GeoJSON<input id="load" type="file" accept=".geojson,.json,application/geo+json"></label>
+    </div>
+    <p id="hint" class="hint" aria-live="polite">Draw the survey area: click its corners on the map.</p>
+  </section>
+
+  <section class="block" aria-labelledby="flight-h">
+    <h2 id="flight-h">Flight</h2>
+    <fieldset class="choice">
+      <legend>Altitude <span class="legend-note">and ground resolution</span></legend>
+      <div id="altitude" class="chips chips-6" data-default="120"></div>
+    </fieldset>
+    <fieldset class="choice">
+      <legend>Speed</legend>
+      <div id="speed" class="chips chips-4" data-default="10"></div>
+    </fieldset>
+    <fieldset class="choice">
+      <legend>Line direction</legend>
+      <div class="direction">
+        <div id="angle-mode" class="chips chips-2">
+          <label class="chip"><input type="radio" name="angle-mode" value="auto" checked><span>Auto</span></label>
+          <label class="chip"><input type="radio" name="angle-mode" value="set"><span>Set</span></label>
+        </div>
+        <label class="angle"><input id="angle" type="number" min="0" max="179" step="1" aria-label="Line direction in degrees from north" disabled><em>°</em></label>
+      </div>
+      <p id="angle-note" class="hint"></p>
+    </fieldset>
+    <div class="fields">
+      <label class="field"><span>Front overlap</span><input id="front" type="number" min="50" max="95" step="1" value="80"><em>%</em></label>
+      <label class="field"><span>Side overlap</span><input id="side" type="number" min="40" max="95" step="1" value="80"><em>%</em></label>
+      <label class="field"><span>At the end</span>
+        <select id="end"><option value="rth">Return home</option><option value="land">Land at last line</option></select>
+      </label>
+    </div>
+    <details class="more">
+      <summary>Battery model</summary>
+      <div class="fields">
+        <label class="field"><span>Endurance</span><input id="endurance" type="number" min="5" max="30" step="0.5" value="15"><em>min</em></label>
+        <label class="field"><span>Keep in reserve</span><input id="reserve" type="number" min="0" max="60" step="5" value="25"><em>%</em></label>
+      </div>
+    </details>
+  </section>
+
+  <section class="block results" aria-labelledby="result-h" aria-live="polite">
+    <h2 id="result-h">Survey</h2>
+    <p id="summary" class="hint">The grid and the split into batteries appear here once the area is drawn.</p>
+    <label class="check"><input id="show-photos" type="checkbox" checked> Show where each photo is taken</label>
+    <ol id="flights" class="flights"></ol>
+    <ul id="notes" class="notes"></ul>
+  </section>
+
+  <section class="block" aria-labelledby="missions-h">
+    <h2 id="missions-h">Missions</h2>
+    <form id="save-form" class="save">
+      <input id="name" type="text" placeholder="Mission name, e.g. north_field" autocomplete="off" aria-label="Mission name">
+      <button id="save" type="submit" class="primary" disabled>Save mission</button>
+    </form>
+    <div class="send">
+      <button id="send" type="button" class="secondary" disabled>Send to FreeFlight</button>
+      <span id="phone" class="phone">Checking for an iPhone…</span>
+    </div>
+    <p id="saved" class="hint" aria-live="polite"></p>
+    <h3 class="missions-h">Saved missions</h3>
+    <ul id="missions" class="missions" aria-label="Saved missions"></ul>
+  </section>
+</aside>
+
+<section id="batteries-view" class="bview" aria-label="Batteries" hidden>
+  <header class="panel-head bview-head">
+    <h1>Anafi Mission Planner</h1>
+    <nav class="modes" aria-label="Mode">
+      <a class="mode" href="#plan" data-view="plan">Plan</a>
+      <a class="mode" href="#batteries" data-view="batteries">Batteries</a>
+    </nav>
+  </header>
+  <div class="bview-body">
+    <div class="bview-intro">
+      <h2 class="bview-title">Batteries</h2>
+      <p class="hint">From FreeFlight's flight logs. How long a full battery lasts = 100 ÷ the % used per
+        minute in the air. Flights under 5 minutes are too short to measure and are left out of the charts.</p>
+    </div>
+    <section class="chart-card packs" aria-labelledby="packs-h">
+      <div class="packs-head">
+        <div>
+          <h3 id="packs-h">Pack check</h3>
+          <p class="hint">Put a pack in the drone, switch it on and let it link. The battery reports its own
+            health, charge and voltage. The motors never start.</p>
+        </div>
+        <div class="packs-actions" hidden>
+          <div class="chips chips-2 link" role="radiogroup" aria-label="Connect through">
+            <label class="chip"><input type="radio" name="link" value="skycontroller" checked><span>Skycontroller USB</span></label>
+            <label class="chip"><input type="radio" name="link" value="wifi"><span>Drone Wi-Fi</span></label>
+          </div>
+          <button id="check-pack" type="button" class="primary">Check the pack in the drone</button>
+        </div>
+      </div>
+      <p id="no-olympe" class="no-olympe" hidden>The pack check reads the battery through Parrot's Olympe SDK,
+        which only runs on x86_64 Linux, so it isn't available on this computer. Your checks from a Linux
+        computer still show below, and the flight-log charts work everywhere.</p>
+      <p id="check-status" class="check-status" aria-live="polite"></p>
+      <div id="gauge-legend" class="chart-legend"></div>
+      <div id="packs" class="packs-grid"></div>
+      <figure id="volt-figure" class="sub-chart" hidden>
+        <figcaption>
+          <h4>Resting voltage against charge</h4>
+          <p class="hint">Every check. Healthy packs follow one rising curve; a pack sitting low on the right reads
+            full but doesn't hold the voltage.</p>
+        </figcaption>
+        <div id="volt-legend" class="chart-legend"></div>
+        <div id="chart-volt" class="chart"></div>
+      </figure>
+    </section>
+    <div class="filters">
+      <div class="chips chips-3 range" role="radiogroup" aria-label="Flights from">
+        <label class="chip"><input type="radio" name="range" value="all" checked><span>All flights</span></label>
+        <label class="chip"><input type="radio" name="range" value="36"><span>Last 3 years</span></label>
+        <label class="chip"><input type="radio" name="range" value="12"><span>Last 12 months</span></label>
+      </div>
+      <button id="pull-runs" type="button" class="secondary">Copy new logs from iPhone</button>
+      <span id="runs-status" class="phone" aria-live="polite"></span>
+    </div>
+    <div id="tiles" class="tiles"></div>
+    <figure class="chart-card">
+      <figcaption>
+        <h3>How long a full battery lasts, flight by flight</h3>
+        <p class="hint">A falling line is a battery losing capacity. Compare with the planner's battery setting.</p>
+      </figcaption>
+      <div id="legend-endurance" class="chart-legend"></div>
+      <div id="chart-endurance" class="chart"></div>
+    </figure>
+    <figure class="chart-card">
+      <figcaption>
+        <h3>Charge during each flight</h3>
+        <p class="hint">Same scales in every panel: a steeper line drains faster. The newest flight is drawn
+          strongest.</p>
+      </figcaption>
+      <div id="chart-discharge" class="multiples"></div>
+    </figure>
+    <section class="chart-card" aria-labelledby="flights-h">
+      <div class="table-head">
+        <h3 id="flights-h">Flights</h3>
+        <label class="check"><input id="show-short" type="checkbox"> Include flights under 5 minutes</label>
+      </div>
+      <p class="hint">Pick the battery that flew each flight to compare them.</p>
+      <div class="table-wrap"><table id="runs-table" class="runs"></table></div>
+    </section>
+  </div>
+  <div id="chart-tip" class="chart-tip" role="tooltip" hidden></div>
+</section>
+
+<script src="vendor/leaflet/leaflet.js"></script>
+<script src="app.js"></script>
+<script src="batteries.js"></script>
+</body>
+</html>
