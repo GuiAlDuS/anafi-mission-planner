@@ -2,7 +2,7 @@
 
 Goal: confirm that the drone runs our flight plans, and that start, pause,
 stop and return home work from the laptop. Start with the tiny mission
-(takeoff, one waypoint 15 m away at 10 m, land), then a tiny survey.
+(takeoff, vertical climb to 10 m, one waypoint 15 m away, land), then a tiny survey.
 
 ## Before leaving
 
