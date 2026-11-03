@@ -49,7 +49,7 @@ def test_load_mission():
     m = _tiny()
     data = format_mission(tiny_mission(LatLon(*HOME[:2]), LatLon(9.9828090, -78.7006829), 10)).encode()
     assert m.uid == hashlib.md5(data).hexdigest()
-    assert m.waypoints == 2 and m.max_altitude_m == 10 and m.problems == []
+    assert m.waypoints == 3 and m.max_altitude_m == 10 and m.problems == []
     assert 14 < m.max_distance_m(HOME) < 16
 
 

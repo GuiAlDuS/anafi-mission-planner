@@ -54,6 +54,29 @@ def _ensure_uploaded(mission: control.Mission, path: Path, http_host: str, uploa
     return rec.uid == mission.uid and rec.readback != "mismatch" and rec.listed
 
 
+class RthWatch:
+    """Notice when a return home ends with the drone hovering over home.
+
+    The Anafi doesn't land after a return home (by default it hovers about 2 m above
+    home), so without a note the live view just keeps waiting for "landed".
+    """
+
+    def __init__(self):
+        self.returning = False
+
+    def update(self, s: control.Status) -> str | None:
+        if s.rth_state in ("inProgress", "pending"):
+            self.returning = True
+            return None
+        if self.returning and s.flying_state == "hovering":
+            self.returning = False
+            dist = s.distance_from_home_m()
+            where = f" ({dist:.0f} m from home)" if dist is not None else ""
+            return (f"Return home finished: the drone is hovering over home{where}. "
+                    "Land it with the Skycontroller.")
+        return None
+
+
 def _confirm(prompt: str) -> bool:
     try:
         return input(prompt).strip().lower() == "yes"
@@ -96,6 +119,7 @@ def _watch(dev, mission: control.Mission, log_dir: Path) -> int:
     start_battery = None
     airborne = False
     quit_armed_at = 0.0
+    rth = RthWatch()
     print(f"Started. Logging to {log_path}\n{KEYS}")
     with open(log_path, "w", newline="") as f, _keys() as read_key:
         log = csv.writer(f)
@@ -111,6 +135,9 @@ def _watch(dev, mission: control.Mission, log_dir: Path) -> int:
             f.flush()
             sys.stdout.write("\r\033[K" + control.format_telemetry(s, t, len(mission.items)))
             sys.stdout.flush()
+
+            if note := rth.update(s):
+                print("\n" + note)
 
             if airborne and s.flying_state == "landed":
                 print(f"\nLanded after {t / 60:.1f} min, battery {start_battery} % -> {s.battery_pct} %.")

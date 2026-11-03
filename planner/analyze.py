@@ -75,14 +75,37 @@ def read_photos(directory: str | Path) -> list[Photo]:
     return sorted(photos, key=lambda p: p.time)
 
 
-def split_lines(photos: list[Photo], max_yaw_change: float = 45, max_gap_s: float = 10) -> list[list[Photo]]:
+def split_lines(photos: list[Photo], max_turn_deg: float = 45, max_gap_s: float = 20,
+                min_step_m: float = 1.0) -> list[list[Photo]]:
+    """Group photos into survey lines by the direction of travel between them.
+
+    A line's direction is set by its first two photos; a step that turns more than
+    max_turn_deg from it (the sideways hop to the next line) or a gap of max_gap_s
+    starts a new line. The drone's own heading isn't used: the Anafi takes the first
+    photo of a line before it has turned onto it, still facing the hop.
+    """
+    proj = LocalProjection(photos[0].pos)
     lines = [[photos[0]]]
+    heading = None  # direction of travel of the current line, degrees
     for a, b in zip(photos, photos[1:]):
-        dyaw = abs((b.yaw_deg - a.yaw_deg + 180) % 360 - 180)
-        if dyaw < max_yaw_change and (b.time - a.time).total_seconds() < max_gap_s:
+        (ax, ay), (bx, by) = proj.to_xy(a.pos), proj.to_xy(b.pos)
+        step = math.hypot(bx - ax, by - ay)
+        if (b.time - a.time).total_seconds() >= max_gap_s:
+            lines.append([b])
+            heading = None
+            continue
+        if step < min_step_m:  # hovering: too short to tell a direction
+            lines[-1].append(b)
+            continue
+        brg = math.degrees(math.atan2(bx - ax, by - ay))
+        if heading is None:
+            lines[-1].append(b)
+            heading = brg
+        elif abs((brg - heading + 180) % 360 - 180) < max_turn_deg:
             lines[-1].append(b)
         else:
             lines.append([b])
+            heading = None
     return lines
 
 

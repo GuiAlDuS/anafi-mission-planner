@@ -118,7 +118,12 @@ def cmd_health(c: FlightPlanClient, args) -> int:
 
 def cmd_fly(c: FlightPlanClient, args) -> int:
     from .fly import fly
-    return fly(args.host, args.file, min_battery_pct=args.min_battery, log_dir=args.log_dir)
+    # The Skycontroller has no upload API of its own: plans go to the drone through
+    # it (route 192.168.42.1 via 192.168.53.1). Any other host (the drone's Wi-Fi, the
+    # simulator at 10.202.0.1) takes the upload itself.
+    http_host = DRONE_HOST if args.host == SKYCONTROLLER_HOST else args.host
+    return fly(args.host, args.file, min_battery_pct=args.min_battery, http_host=http_host,
+               log_dir=args.log_dir)
 
 
 def _plan_command(name: str):

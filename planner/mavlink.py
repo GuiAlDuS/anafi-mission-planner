@@ -172,9 +172,16 @@ def survey_mission(
 
 
 def tiny_mission(home: LatLon, target: LatLon, altitude_m: float = 10.0) -> list[MissionItem]:
-    """Smallest useful plan for first upload tests: takeoff, one waypoint, land."""
+    """Smallest useful plan for first tests: takeoff, climb, one waypoint, land.
+
+    The Anafi's takeoff only lifts it to about 1 m, so the plan climbs straight up
+    over home before flying to the target; going straight to the target would climb
+    on a slant (seen in the Sphinx simulator). It lands vertically at the target.
+    """
+    h = heading_deg(home, target)
     return [
         MissionItem(Cmd.NAV_TAKEOFF, Frame.GLOBAL_RELATIVE_ALT, x=home.lat, y=home.lon, z=altitude_m),
-        waypoint(target, altitude_m, heading_deg(home, target)),
+        waypoint(home, altitude_m, h),
+        waypoint(target, altitude_m, h),
         MissionItem(Cmd.NAV_LAND),
     ]

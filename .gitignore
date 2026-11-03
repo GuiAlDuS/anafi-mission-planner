@@ -15,3 +15,5 @@ orthophotos/
 wms_layers.json
 # Parrot manuals (Parrot copyright, kept local, not redistributed)
 drone/manuals/
+# Sphinx simulator: firmware, built kernel module, run logs
+sim/cache/

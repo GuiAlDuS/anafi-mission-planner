@@ -68,8 +68,9 @@ def test_tiny_mission_golden(home):
     assert text == (
         "QGC WPL 120\n"
         "0\t0\t3\t22\t0.000000\t0.000000\t0.000000\t0.000000\t9.98267430\t-78.70068290\t10.000000\t1\n"
-        "1\t0\t3\t16\t0.000000\t3.000000\t0.000000\t0.000000\t9.98276430\t-78.70068290\t10.000000\t1\n"
-        "2\t0\t3\t21\t0.000000\t0.000000\t0.000000\t0.000000\t0.00000000\t0.00000000\t0.000000\t1\n"
+        "1\t0\t3\t16\t0.000000\t3.000000\t0.000000\t0.000000\t9.98267430\t-78.70068290\t10.000000\t1\n"
+        "2\t0\t3\t16\t0.000000\t3.000000\t0.000000\t0.000000\t9.98276430\t-78.70068290\t10.000000\t1\n"
+        "3\t0\t3\t21\t0.000000\t0.000000\t0.000000\t0.000000\t0.00000000\t0.00000000\t0.000000\t1\n"
     )
 
 
@@ -131,3 +132,36 @@ def test_survey_mission_climbs_and_returns_over_home(mission, home):
     # Back over home at survey altitude before RTH, so RTH only descends.
     assert items[-1].command == Cmd.NAV_RETURN_TO_LAUNCH
     assert items[-2] == wps[-1] and (wps[-1].x, wps[-1].y) == (home.lat, home.lon) and wps[-1].z == 120
+
+
+def _slanted_legs(items, home):
+    """Legs that change altitude while moving sideways, walking the mission as the
+    Anafi flies it: takeoff only lifts it to about 1 m over home, waypoints are flown
+    in a straight line, LAND descends where the drone is, and RTL flies home at
+    return-home altitude (so it must start over home to descend vertically)."""
+    from planner.geo import distance_m
+    pos, alt, bad = home, 0.0, []
+    for i, it in enumerate(items):
+        if it.command == Cmd.NAV_TAKEOFF:
+            alt = 1.0
+        elif it.command == Cmd.NAV_WAYPOINT:
+            nxt = LatLon(it.x, it.y)
+            if abs(it.z - alt) > 0.5 and distance_m(pos, nxt) > 1.0:
+                bad.append(f"item {i}: {alt:.0f} -> {it.z:.0f} m over {distance_m(pos, nxt):.0f} m")
+            pos, alt = nxt, it.z
+        elif it.command == Cmd.NAV_RETURN_TO_LAUNCH and distance_m(pos, home) > 1.0:
+            bad.append(f"item {i}: return home starts {distance_m(pos, home):.0f} m from home")
+    return bad
+
+
+@pytest.mark.parametrize("kind", ["tiny", "survey_rth", "survey_land"])
+def test_no_mission_climbs_or_descends_while_moving_sideways(kind, area, home):
+    # The rule from the first field test, where a slanted climb hit branches.
+    if kind == "tiny":
+        items = tiny_mission(home, LatLon(home.lat + 0.0002, home.lon + 0.0002), 10)
+    else:
+        s = SurveySettings()
+        g = generate_grid(area, s, 90, home)
+        items = survey_mission(g.lines, home, s.altitude_m, s.speed_ms, g.photo_spacing_m,
+                               end_action=kind.split("_")[1])
+    assert _slanted_legs(items, home) == []
