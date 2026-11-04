@@ -181,6 +181,10 @@ flight is held by `anafi-gui`, not the page: closing the browser
 doesn't touch it. If `anafi-gui` itself stops, the drone carries on or returns
 home by itself; the Skycontroller can always take over.
 
+![The Fly tab, ready: mission on the drone, every check passed, hold to take off](docs/images/fly_ready.jpg)
+
+![The Fly tab in flight: the drone and its track on the map, line progress, the live camera, Return home](docs/images/fly_flying.jpg)
+
 The same from a terminal:
 
 ```bash

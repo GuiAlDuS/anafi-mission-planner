@@ -540,29 +540,29 @@ table.runs { border-collapse: collapse; width: 100%; font-size: 14px; }
 .fly { display: flex; flex-direction: column; }
 .fly .panel-top { background: var(--surface); border-bottom: 2px solid var(--ink); }
 
-/* Instrument strip: the battery is a meter (it has a limit that matters), the rest are numbers. */
-.instruments {
-  display: grid; grid-template-columns: 1.45fr 1fr 1fr 1fr; gap: 10px; align-items: start;
-  padding: 12px 18px 8px;
-}
-.instruments .stat b { font-size: 28px; }
-.instruments small { display: block; white-space: nowrap; }
-.battery-meter small { color: var(--muted); font-size: 13px; }
-.meter-head { display: flex; align-items: baseline; gap: 6px; }
-.meter-head b { font: 700 28px/1 var(--cond); font-variant-numeric: tabular-nums; }
-.meter-word { font: 600 13px/1 var(--sans); color: var(--muted); white-space: nowrap; }
-.meter-word.is-ok { color: var(--ok); }
-.meter-word.is-tight { color: var(--tight); }
-.meter-word.is-low { color: var(--danger); }
-.meter-track {
-  position: relative; height: 8px; margin: 4px 0 2px; border-radius: 4px;
-  background: #E3E8E6; overflow: visible;
-}
+/* Instrument strip: the battery gets its own row (it has a limit that matters); the three
+   plain numbers sit below it, each with its unit, and a one-word label under it. */
+.instruments { padding: 12px 18px 10px; }
+.battery-meter { display: grid; grid-template-columns: auto 1fr; gap: 12px; align-items: center; }
+.battery-pct { font: 700 32px/1 var(--cond); font-variant-numeric: tabular-nums; min-width: 2.4em; }
+.meter-body { min-width: 0; }
+.meter-track { position: relative; height: 10px; border-radius: 5px; background: #E3E8E6; }
 .meter-fill { height: 100%; width: 0; border-radius: 5px; background: var(--muted); }
 .meter-fill.is-ok { background: var(--ok); }
 .meter-fill.is-tight { background: var(--tight); }
 .meter-fill.is-low { background: var(--danger); }
-.meter-min { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); }
+.meter-min { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); }
+.meter-word { display: block; margin-top: 5px; font: 600 13px/1.2 var(--sans); color: var(--muted); }
+.meter-word.is-ok { color: var(--ok); }
+.meter-word.is-tight { color: var(--tight); }
+.meter-word.is-low { color: var(--danger); }
+.gauges {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+  margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--rule);
+}
+.fly-gauge b { display: block; font: 700 26px/1 var(--cond); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.fly-gauge b small { margin-left: 3px; font: 600 15px/1 var(--cond); color: var(--muted); }
+.fly-gauge > span { display: block; margin-top: 3px; color: var(--muted); font-size: 13px; }
 
 .flight-line { padding: 0 18px 12px; }
 .fly-state { margin: 2px 0 8px; font: 600 17px/1.25 var(--cond); }

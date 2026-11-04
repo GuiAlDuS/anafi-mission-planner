@@ -245,10 +245,10 @@
 
   function batteryLevel(pct) {
     const min = st ? st.min_battery_pct : 30;
-    if (pct === null || pct === undefined) return { cls: "", word: "" };
-    if (pct < min) return { cls: "is-low", word: airborne() ? "Low: return home" : "Too low to take off" };
-    if (pct < min + 15) return { cls: "is-tight", word: "Getting low" };
-    return { cls: "is-ok", word: "Good" };
+    if (pct === null || pct === undefined) return { cls: "", word: "Battery" };
+    if (pct < min) return { cls: "is-low", word: airborne() ? "Low: return home" : `Too low to take off (minimum ${min}%)` };
+    if (pct < min + 15) return { cls: "is-tight", word: "Battery getting low" };
+    return { cls: "is-ok", word: "Battery good" };
   }
 
   // ---------- rendering ----------
@@ -315,6 +315,13 @@
     ls.textContent = { connected: `Connected to ${st && st.link.host}`, connecting: "Connecting…",
       lost: "Link lost", disconnected: "Not connected" }[link];
     ls.className = `link-state ${link === "connected" ? "is-on" : link === "lost" ? "is-lost" : ""}`;
+    // Connected (perhaps from an earlier page): show the link actually in use.
+    if (st && (link === "connected" || link === "connecting") && st.link.host) {
+      const kind = { "192.168.53.1": "skycontroller", "192.168.42.1": "wifi" }[st.link.host] || "other";
+      const radio = document.querySelector(`input[name="fly-link"][value="${kind}"]`);
+      if (radio && !radio.checked) radio.checked = true;
+      if (kind === "other" && document.activeElement !== byId("fly-host")) byId("fly-host").value = st.link.host;
+    }
     const other = document.querySelector('input[name="fly-link"]:checked').value === "other";
     document.querySelector(".fly-host").hidden = !other;
     byId("fly-connect").hidden = link === "connected" || link === "connecting";

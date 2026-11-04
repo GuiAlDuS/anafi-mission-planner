@@ -123,13 +123,17 @@
     </header>
     <div class="instruments" aria-live="off">
       <div class="battery-meter" id="fly-battery" role="meter" aria-label="Battery" aria-valuemin="0" aria-valuemax="100">
-        <div class="meter-head"><b id="fly-battery-pct">–</b><span id="fly-battery-word" class="meter-word"></span></div>
-        <div class="meter-track"><div class="meter-fill" id="fly-battery-fill"></div><div class="meter-min" id="fly-battery-min" title="Minimum to take off"></div></div>
-        <small>battery</small>
+        <b id="fly-battery-pct" class="battery-pct">–</b>
+        <div class="meter-body">
+          <div class="meter-track"><div class="meter-fill" id="fly-battery-fill"></div><div class="meter-min" id="fly-battery-min" title="Minimum to take off"></div></div>
+          <span id="fly-battery-word" class="meter-word">Battery</span>
+        </div>
       </div>
-      <div class="stat"><b id="fly-alt">–</b><small>altitude, m</small></div>
-      <div class="stat"><b id="fly-speed">–</b><small>speed, m/s</small></div>
-      <div class="stat"><b id="fly-home">–</b><small>to home, m</small></div>
+      <div class="gauges">
+        <div class="fly-gauge"><b><span id="fly-alt">–</span><small>m</small></b><span>altitude</span></div>
+        <div class="fly-gauge"><b><span id="fly-speed">–</span><small>m/s</small></b><span>speed</span></div>
+        <div class="fly-gauge"><b><span id="fly-home">–</span><small>m</small></b><span>to home</span></div>
+      </div>
     </div>
     <div class="flight-line">
       <div class="state-row">

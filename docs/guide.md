@@ -94,6 +94,8 @@ Fly a saved mission from the laptop (Olympe; x86_64 Linux). The page only
 shows and sends; `anafi-gui` holds the drone link, so closing or reloading the
 browser doesn't touch the flight.
 
+![The Fly tab in flight](images/fly_flying.jpg)
+
 1. **Drone link.** Skycontroller USB (the normal field setup: add the route
    `sudo ip route add 192.168.42.1/32 via 192.168.53.1` once per plug-in, for
    the upload), Drone Wi-Fi, or Other address (`10.202.0.1` for the
