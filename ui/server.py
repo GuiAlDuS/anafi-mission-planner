@@ -33,6 +33,7 @@ from planner.mavlink import format_mission, survey_mission, validate_mission
 from planner.plan import plan_geojson, plan_survey
 from planner.runs import LABELS_FILE, load_labels, read_run, save_labels
 
+from .fly import FlyError, FlyLink
 from .wms import WmsError, WmsStore
 from .wms import base_url as wms_base_url
 from .wms import fetch_capabilities as wms_fetch_capabilities
@@ -481,7 +482,8 @@ def ortho_store(folder: Path):
 
 
 def make_handler(out_root: Path, runs: RunCache, batteries: BatteryStore,
-                 tiles: dict[str, TileSource] = TILE_SOURCES, orthos=None, wms: WmsStore | None = None):
+                 tiles: dict[str, TileSource] = TILE_SOURCES, orthos=None, wms: WmsStore | None = None,
+                 fly: FlyLink | None = None):
     wms_caps: dict[str, dict] = {}  # service URL -> its layer list, between "find layers" and "add"
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # keep the terminal quiet
@@ -502,6 +504,10 @@ def make_handler(out_root: Path, runs: RunCache, batteries: BatteryStore,
             path = self.path.split("?", 1)[0]
             if path == "/api/config":
                 return self._json(200, config(tiles))
+            if path == "/api/fly":
+                query = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
+                since = int((query.get("since") or ["0"])[0] or 0)
+                return self._json(200, fly.state(since))
             if path == "/api/missions":
                 return self._json(200, {"missions": list_missions(out_root)})
             if m := re.fullmatch(r"/api/missions/([A-Za-z0-9_-]+)", path):
@@ -610,6 +616,18 @@ def make_handler(out_root: Path, runs: RunCache, batteries: BatteryStore,
                     except OrthoError as e:
                         raise BadRequest(str(e)) from e
                     return self._json(200, {"items": orthos.list()})
+                if self.path.startswith("/api/fly/"):
+                    action = self.path.removeprefix("/api/fly/")
+                    if action == "connect":
+                        return self._json(200, fly.connect(str(req.get("link", "")), req.get("host")))
+                    if action == "disconnect":
+                        return self._json(200, fly.disconnect(bool(req.get("force"))))
+                    if action == "mission":
+                        return self._json(200, fly.select_mission(str(req.get("name", "")), int(req.get("flight", 1))))
+                    if action == "start":
+                        return self._json(200, fly.start())
+                    if action == "command":
+                        return self._json(200, fly.command(str(req.get("action", ""))))
                 if self.path == "/api/runs/pull":
                     if iphone.connected() is None:
                         raise BadRequest("no iPhone found: plug it in with its cable, unlock it and tap Trust")
@@ -627,10 +645,13 @@ def serve(host: str = "127.0.0.1", port: int = 8765, out_root: str | Path = "out
           runs_dir: str | Path = "freeflight_runs", battery_log: str | Path = battery.LOG_FILE,
           battery_reader=None, extra_tiles: list[str] = (),
           orthophotos: str | Path = "orthophotos", wms_layers: str | Path = "wms_layers.json",
-          tile_cache: Path = TILE_CACHE) -> ThreadingHTTPServer:
+          tile_cache: Path = TILE_CACHE, fly: FlyLink | None = None) -> ThreadingHTTPServer:
     tiles = dict(TILE_SOURCES)
     tiles.update(parse_tile_source(spec) for spec in extra_tiles)
-    return ThreadingHTTPServer((host, port), make_handler(Path(out_root), RunCache(Path(runs_dir)),
-                                                          BatteryStore(Path(battery_log), battery_reader), tiles,
-                                                          ortho_store(Path(orthophotos)),
-                                                          WmsStore(Path(wms_layers), tile_cache)))
+    fly = fly or FlyLink(Path(out_root))
+    server = ThreadingHTTPServer((host, port), make_handler(Path(out_root), RunCache(Path(runs_dir)),
+                                                            BatteryStore(Path(battery_log), battery_reader), tiles,
+                                                            ortho_store(Path(orthophotos)),
+                                                            WmsStore(Path(wms_layers), tile_cache), fly))
+    server.fly = fly  # so the caller can let go of the drone on shutdown
+    return server

@@ -41,6 +41,10 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         pass
     finally:
+        if server.fly.status is not None and server.fly.status.flying_state not in (None, "landed"):
+            print("The drone is flying: it now has no controller here. It carries on with the plan or "
+                  "returns home; take over with the Skycontroller.")
+        server.fly.shutdown()
         server.server_close()
     return 0
 
