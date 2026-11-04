@@ -41,8 +41,9 @@ ways:
   logs, and a ground check of what each pack reports about itself.
 - **Drone health check** after a crash or a repair, including a photo test that
   proves the gimbal really moves.
-- **Laptop flight control:** pre-flight checks, live telemetry, one-key return
-  home, pause and stop.
+- **Laptop flight control:** the GUI's Fly tab (live map, battery against your
+  minimum, line progress, press-and-hold takeoff, always-visible Return home)
+  or the terminal: pre-flight checks, pause/resume, stop, land.
 
 ## Status
 
@@ -53,7 +54,7 @@ ways:
 | FreeFlight 6 transfer | ✅ FreeFlight lists and opens the plans · ⚠️ the first flight crashed; fixed and flown in the simulator, not yet on a real drone |
 | GUI: plan, missions, map layers, batteries | ✅ |
 | Battery and drone health checks | ✅ ground checks run on the real drone |
-| Laptop flight control (Olympe) | 🔧 built; start, pause, stop and return home await a field test |
+| Laptop flight control (Olympe): Fly tab and terminal | 🔧 built and flown in the simulator; awaits a field test |
 | Real survey and overlap tuning | 🙋 help wanted |
 
 ### Tested in Parrot's simulator
@@ -116,6 +117,7 @@ Planning runs anywhere Python does, macOS on Apple Silicon included.
 |---|---|
 | FreeFlight path | an iPhone with FreeFlight 6; on the computer `libimobiledevice` and `usbmuxd` (tested on Linux) |
 | Laptop path, pack and health checks | x86_64 Linux (Olympe has no other builds) |
+| The Fly tab's live camera | `ffmpeg` |
 | `anafi-plan analyze` | `exiftool` |
 
 Drone: original Anafi (4K), firmware 1.8.2, Skycontroller 3.
@@ -162,7 +164,24 @@ More: [map, drawing and editing](docs/guide.md#the-map) ·
 ## Fly from a Linux laptop
 
 Plug the Skycontroller 3 into the computer with a USB **data** cable. The drone
-is reached through it:
+is reached through it.
+
+**In `anafi-gui`, the Fly tab:** connect (Skycontroller USB, drone Wi-Fi or
+another address), pick a saved mission and press **Load on the drone**, then
+**hold "Hold to take off" for 2 seconds** once every check is green. The map
+shows the route and the drone live with its flown track; the panel shows the
+battery against your minimum, altitude, speed, distance from home and which line
+it's on, and the drone's live camera if you want it (needs `ffmpeg`). **Return
+home** is always at the bottom, with Pause/Resume, Land and Stop plan; after a
+takeover with the sticks it offers to **refly the interrupted line** from its
+start. Landed before the end of the survey (battery swap, takeover), it
+offers **Continue from line N**: carry the drone back to the takeoff point and
+take off again. Takeoffs more than 10 m from the takeoff point are refused. The
+flight is held by `anafi-gui`, not the page: closing the browser
+doesn't touch it. If `anafi-gui` itself stops, the drone carries on or returns
+home by itself; the Skycontroller can always take over.
+
+The same from a terminal:
 
 ```bash
 sudo ip route add 192.168.42.1/32 via 192.168.53.1   # once per plug-in

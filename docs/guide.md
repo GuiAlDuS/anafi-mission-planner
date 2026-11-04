@@ -5,6 +5,7 @@ short version.
 
 - [The map](#the-map)
 - [Map layers](#map-layers)
+- [The Fly tab](#the-fly-tab)
 - [The Batteries tab](#the-batteries-tab)
 - [Command line](#command-line)
 
@@ -86,6 +87,65 @@ uv run anafi-gui --tiles "Orthophoto=https://server.example/{z}/{x}/{y}.png"
 
 Use only sources whose terms allow it. Google's imagery isn't offered: it
 needs a paid API key and its terms forbid saving tiles for offline use.
+
+## The Fly tab
+
+Fly a saved mission from the laptop (Olympe; x86_64 Linux). The page only
+shows and sends; `anafi-gui` holds the drone link, so closing or reloading the
+browser doesn't touch the flight.
+
+1. **Drone link.** Skycontroller USB (the normal field setup: add the route
+   `sudo ip route add 192.168.42.1/32 via 192.168.53.1` once per plug-in, for
+   the upload), Drone Wi-Fi, or Other address (`10.202.0.1` for the
+   [simulator](simulator.md)). Disconnect is refused while the drone flies.
+2. **Mission.** Pick a mission saved in Plan and, for a multi-battery mission,
+   the flight: its route, area and takeoff point appear on the map at once, with
+   its time and battery estimate ("Preview: ... Not on the drone yet."). **Load
+   on the drone** uploads it if it isn't there yet.
+3. **Before takeoff.** Each check that fails is listed in words (no GPS fix,
+   battery below the minimum, mission above the drone's altitude limit, ...).
+   When all pass, **press and hold "Hold to take off" for 2 seconds**: a short
+   press does nothing. The checks are read again at that moment.
+4. **In flight.** The strip at the top shows the battery against the 30 %
+   takeoff minimum (green, amber "Getting low", red "Low: return home"),
+   altitude, speed and distance from home, then what the drone is doing ("Flying
+   line 3 of 8. Photos on.") and one segment per survey line: flown, flying,
+   to fly. The map shows the route (solid where photos are taken, dashed for
+   transit), the drone and its flown track, and the geofence circle.
+   The drone is the yellow arrow, pointing where it faces.
+5. **Controls**, always at the bottom: **Return home**, Pause/Resume (after a
+   resume halfway along a line the photos are switched back on), Land (where it
+   is), Stop plan (hover). Return home ends hovering over home: press Land.
+6. **Taking over.** A push on the Skycontroller's sticks pauses the plan and
+   gives you the drone. If you then fly it more than 5 m away, the panel offers
+   **Refly line N from its start**: a short plan uploaded while the drone hovers
+   climbs or descends to survey altitude on the spot, flies that line again from
+   its start, then the rest. (Resuming would cut straight to the line's end.)
+   Otherwise Resume finishes the line from where it paused. Return home is
+   always the other choice.
+7. **Camera.** **Show camera** (next to the status line) opens the drone's live
+   picture over the map, about 5 frames a second; Larger/Hide on the window. It
+   needs `ffmpeg` on the computer. The drone streams its video to the controller
+   anyway, so this adds nothing to the drone's link; ffmpeg turns it into small
+   pictures (7-8 % of one core on a desktop). The drone restarts its video when it
+   switches camera modes during a survey: the view says so and comes back within
+   a few seconds.
+
+**Always take off from the mission's takeoff point (the H).** The drone sets its
+home wherever it takes off, and the mission climbs straight up over its own
+takeoff point: taken off elsewhere, it would fly there while climbing, and
+return home would come back to the wrong spot. So the checks refuse a takeoff
+more than 10 m from H ("carry it back to the takeoff point").
+
+**Landed before the end of the survey** (to swap the battery, or after a
+takeover): the Fly tab says which line it stopped on and offers **Continue from
+line N**. It saves `name_from_line_N` (the same grid, from that line on, as
+"Start at line" in Plan), loads it on the drone, and you take off as usual from
+H: the drone climbs over H and flies that line again whole, then the rest. The
+drone itself can't just resume from the ground: it would fly straight to its
+next waypoint while climbing. For the same reason a plan left paused on the
+drone (return home pauses it, landing doesn't clear it) is stopped before the
+next takeoff.
 
 ## The Batteries tab
 

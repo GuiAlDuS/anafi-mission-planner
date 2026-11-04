@@ -667,7 +667,8 @@ function drawArea() {
 function drawHome() {
   if (homeMarker) { homeMarker.remove(); homeMarker = null; }
   if (!state.home) return;
-  homeMarker = L.marker(state.home, { icon: homeIcon, draggable: true, zIndexOffset: 1000 }).addTo(map);
+  homeMarker = L.marker(state.home, { icon: homeIcon, draggable: true, zIndexOffset: 1000 });
+  if (document.body.dataset.view !== "fly") homeMarker.addTo(map); // Fly shows the flown mission's home
   homeMarker.on("dragend", (e) => {
     const ll = e.target.getLatLng();
     state.home = [ll.lat, ll.lng];
@@ -1328,16 +1329,29 @@ setInterval(checkPhone, 4000);
 document.addEventListener("visibilitychange", checkPhone);
 
 // ---------- views (Plan / Batteries) ----------
+// Plan's own map layers: hidden while flying, so the map shows only the mission being flown.
+function showPlanLayers(on) {
+  for (const layer of [areaLayer, routeLayer, photoLayer, vertexLayer, homeMarker]) {
+    if (!layer) continue;
+    if (on && !map.hasLayer(layer)) layer.addTo(map);
+    if (!on && map.hasLayer(layer)) layer.remove();
+  }
+}
+
 function setView() {
-  const view = location.hash === "#batteries" ? "batteries" : "plan";
+  const view = { "#batteries": "batteries", "#fly": "fly" }[location.hash] || "plan";
   document.body.dataset.view = view;
   $("batteries-view").hidden = view !== "batteries";
+  $("plan-panel").hidden = view === "fly";
+  $("fly-panel").hidden = view !== "fly";
+  if (view === "fly" && state.mode !== "idle") setMode("idle");
+  showPlanLayers(view !== "fly");
   for (const a of document.querySelectorAll(".mode")) {
     const on = a.dataset.view === view;
     a.classList.toggle("is-active", on);
     if (on) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
   }
-  if (view === "plan") map.invalidateSize(); // the map had no size while hidden
+  if (view !== "batteries") map.invalidateSize(); // the map had no size while hidden
   window.dispatchEvent(new CustomEvent("viewchange", { detail: view }));
 }
 window.addEventListener("hashchange", setView);

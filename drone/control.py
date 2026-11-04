@@ -12,6 +12,7 @@ Skycontroller 3 over USB (SKYCONTROLLER_HOST), which relays drone messages.
 from __future__ import annotations
 
 import hashlib
+import math
 import logging
 import time
 import warnings
@@ -45,6 +46,7 @@ class Status:
     alert: str | None = None
     altitude_m: float | None = None  # above takeoff
     speed_ms: float | None = None  # horizontal
+    heading_deg: float | None = None  # where the drone faces, clockwise from north
     mission_item: int | None = None  # index of the last executed mission item
     rth_state: str | None = None  # available, inProgress, unavailable, pending
     play_error: str | None = None  # why the last Start failed
@@ -137,6 +139,8 @@ def read_status(dev) -> Status:
         s.altitude_m = st["altitude"]
     if st := get(PilotingState.SpeedChanged):
         s.speed_ms = (st["speedX"] ** 2 + st["speedY"] ** 2) ** 0.5
+    if st := get(PilotingState.AttitudeChanged):
+        s.heading_deg = math.degrees(st["yaw"]) % 360  # yaw in radians, 0 = north
     if st := get(MavlinkState.MissionItemExecuted):
         s.mission_item = st["idx"]
     if st := get(PilotingState.NavigateHomeStateChanged):
@@ -188,6 +192,12 @@ class Mission:
         return [(it.x, it.y, it.z) for it in self.items if it.command in NAV_COMMANDS]
 
     @property
+    def takeoff_point(self) -> tuple[float, float] | None:
+        """Where the mission expects to take off: its first point (our missions climb straight up there)."""
+        pts = self.nav_points
+        return (pts[0][0], pts[0][1]) if pts else None
+
+    @property
     def waypoints(self) -> int:
         return len(self.nav_points)
 
@@ -221,9 +231,19 @@ def load_mission(data: bytes) -> Mission:
     return Mission(hashlib.md5(data).hexdigest(), items, validate_mission(items))
 
 
+MAX_TAKEOFF_OFFSET_M = 10.0  # GPS error, not a different takeoff spot
+
+
 def preflight_problems(s: Status, m: Mission, on_drone: bool, min_battery_pct: int) -> list[str]:
     """Reasons not to start `m` now. Empty means go."""
     p = [f"mission file: {x}" for x in m.problems]
+    # Taking off elsewhere moves the drone's home there (its return home would come back to
+    # that spot), and the mission's climb over its own takeoff point becomes a slanted climb.
+    if s.position is not None and m.takeoff_point is not None:
+        off = distance_m(LatLon(*s.position[:2]), LatLon(*m.takeoff_point))
+        if off > MAX_TAKEOFF_OFFSET_M:
+            p.append(f"the drone is {off:.0f} m from the mission's takeoff point: carry it back to the "
+                     f"takeoff point (H on the map), or plan the mission from where it is")
     if not on_drone:
         p.append(f"plan {m.uid} is not on the drone (upload it after switching the drone on)")
     if s.flying_state != "landed":

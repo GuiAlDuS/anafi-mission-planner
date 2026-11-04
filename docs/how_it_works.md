@@ -118,6 +118,8 @@ drone/
   fly.py            terminal front end: checks, typed confirmation, live telemetry, keys
 ui/
   server.py         local web app (standard library): API, tile cache, imagery date
+  fly.py            the Fly tab's drone link: one Olympe connection, background reads, commands
+  video.py          the Fly tab's live camera: ffmpeg from the drone's RTSP to MJPEG, on demand
   ortho.py          your orthophotos: store, metadata, map tiles (rio-tiler, optional)
   wms.py            WMS layers: read a service's layer list, fetch and cache tiles
   static/           page, map and battery charts; Leaflet and fonts stored locally

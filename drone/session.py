@@ -168,8 +168,21 @@ class FlightSession:
     # ---- commands
 
     def start(self) -> None:
-        """Take off and start the plan (preflight checks and the pilot's confirmation come first)."""
+        """Take off and start the plan from its beginning (checks and the pilot's confirmation come first).
+
+        A plan paused on an earlier flight (return home pauses it, and landing doesn't clear
+        it) stays on the drone, and Start would resume it: from the ground, straight to its
+        next waypoint, climbing on a slant (seen in the simulator, 2026-11-04). So a paused
+        plan is stopped first, and the flight begins with its vertical climb over home.
+        """
         with self._lock:
+            if self.ctl.read_status(self.dev).plan_state == "paused":
+                self.ctl.stop_plan(self.dev)
+                if self.ctl.read_status(self.dev).plan_state == "paused":
+                    raise control.DroneError("a paused flight plan is still on the drone and didn't stop; "
+                                             "not starting, it would resume from the middle")
+                self._event("info", "Stopped the paused plan left from the last flight, "
+                                    "so this one starts from the beginning.")
             self.log_dir.mkdir(parents=True, exist_ok=True)
             self.log_path = self.log_dir / f"{dt.datetime.now():%Y%m%d_%H%M%S}_{self.mission.uid[:8]}.csv"
             self._log_file = open(self.log_path, "w", newline="")
@@ -193,6 +206,15 @@ class FlightSession:
             if self._photos.on_resume(item):
                 self.ctl.start_photos(self.dev)
                 self._event("info", "Photos back on for the rest of this line.")
+
+    def switch_mission(self, mission: control.Mission, why: str) -> None:
+        """In the air: stop the paused plan and fly `mission` instead (already on the drone)."""
+        with self._lock:
+            self.ctl.stop_plan(self.dev)
+            self.mission = mission
+            self._photos = PhotoResume(mission.items)
+            self.ctl.start_plan(self.dev, mission.uid)
+            self._event("action", why)
 
     def toggle_pause(self) -> str | None:
         """Pause a playing plan or resume a paused one; returns what it did, or None."""

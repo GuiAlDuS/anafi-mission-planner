@@ -12,6 +12,7 @@ import json
 import mimetypes
 import re
 import threading
+import time
 from dataclasses import asdict, dataclass
 import urllib.error
 import urllib.parse
@@ -34,6 +35,7 @@ from planner.plan import plan_geojson, plan_survey
 from planner.runs import LABELS_FILE, load_labels, read_run, save_labels
 
 from .fly import FlyError, FlyLink
+from .video import VideoRelay
 from .wms import WmsError, WmsStore
 from .wms import base_url as wms_base_url
 from .wms import fetch_capabilities as wms_fetch_capabilities
@@ -305,6 +307,23 @@ def delete_mission(out_root: Path, name: str, trash=None) -> None:
         raise BadRequest(f"couldn't move {name} to the trash ({e}); nothing was deleted") from e
 
 
+class MissionBook:
+    """Saved missions as the Fly tab needs them: survey line numbers, continuing from a line."""
+
+    def __init__(self, out_root: Path):
+        self.out_root = Path(out_root)
+
+    def first_line(self, name: str, flight: int) -> tuple[int, int]:
+        """(first survey line of that flight, lines in the whole survey), 1-based."""
+        resp = build_plan(load_mission(self.out_root, name))[0]
+        return resp["flights"][flight - 1]["first_line"], resp["total_lines"]
+
+    def continue_from(self, name: str, line: int) -> str:
+        """Save the survey from `line` on (Plan's "Start at line"); returns the new mission's name."""
+        req = {**load_mission(self.out_root, name), "from_line": line}
+        return Path(save_plan(req, self.out_root)["folder"]).name
+
+
 def save_plan(req: dict, out_root: Path) -> dict:
     return _save(req, out_root)[0]
 
@@ -483,7 +502,7 @@ def ortho_store(folder: Path):
 
 def make_handler(out_root: Path, runs: RunCache, batteries: BatteryStore,
                  tiles: dict[str, TileSource] = TILE_SOURCES, orthos=None, wms: WmsStore | None = None,
-                 fly: FlyLink | None = None):
+                 fly: FlyLink | None = None, video: VideoRelay | None = None):
     wms_caps: dict[str, dict] = {}  # service URL -> its layer list, between "find layers" and "add"
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, fmt, *args):  # keep the terminal quiet
@@ -507,7 +526,9 @@ def make_handler(out_root: Path, runs: RunCache, batteries: BatteryStore,
             if path == "/api/fly":
                 query = urllib.parse.parse_qs(self.path.split("?", 1)[1] if "?" in self.path else "")
                 since = int((query.get("since") or ["0"])[0] or 0)
-                return self._json(200, fly.state(since))
+                return self._json(200, {**fly.state(since), "video": video.state() if video else None})
+            if path == "/api/fly/video":
+                return self._video()
             if path == "/api/missions":
                 return self._json(200, {"missions": list_missions(out_root)})
             if m := re.fullmatch(r"/api/missions/([A-Za-z0-9_-]+)", path):
@@ -569,6 +590,43 @@ def make_handler(out_root: Path, runs: RunCache, batteries: BatteryStore,
                 return self._json(500, {"error": f"couldn't prepare the file ({type(e).__name__}: {e})"})
             return self._json(200, meta)
 
+        def _video(self):
+            """The live camera as MJPEG (multipart/x-mixed-replace), for an <img> on the Fly tab."""
+            try:
+                if video is None or not video.available:
+                    raise FlyError("the camera view needs ffmpeg: install it, then restart anafi-gui")
+                url = fly.video_url()
+                video.watch(url)
+            except (FlyError, RuntimeError) as e:
+                return self._json(409, {"error": str(e)})
+            try:
+                self.send_response(200)
+                self.send_header("Content-Type", "multipart/x-mixed-replace; boundary=frame")
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                at, down_since = 0.0, None
+                while True:
+                    frame, at = video.next_frame(at)
+                    if frame is None:
+                        # The drone ends the stream when it switches camera modes and the relay
+                        # restarts it in a second or two: hold the page's connection meanwhile.
+                        if video.state()["running"]:
+                            down_since = None
+                        else:
+                            down_since = down_since or time.monotonic()
+                            if time.monotonic() - down_since > 10:
+                                break  # really gone: the page shows why and retries
+                        continue
+                    down_since = None
+                    self.wfile.write(b"--frame\r\nContent-Type: image/jpeg\r\nContent-Length: "
+                                     + str(len(frame)).encode() + b"\r\n\r\n" + frame + b"\r\n")
+                    self.wfile.flush()
+            except (BrokenPipeError, ConnectionResetError):
+                pass  # the page closed the view
+            finally:
+                self.close_connection = True
+                video.leave()
+
         def do_POST(self):
             if self.path == "/api/orthophotos/upload":
                 return self._upload_ortho()
@@ -626,6 +684,8 @@ def make_handler(out_root: Path, runs: RunCache, batteries: BatteryStore,
                         return self._json(200, fly.select_mission(str(req.get("name", "")), int(req.get("flight", 1))))
                     if action == "start":
                         return self._json(200, fly.start())
+                    if action == "continue":
+                        return self._json(200, fly.continue_survey())
                     if action == "command":
                         return self._json(200, fly.command(str(req.get("action", ""))))
                 if self.path == "/api/runs/pull":
@@ -648,10 +708,11 @@ def serve(host: str = "127.0.0.1", port: int = 8765, out_root: str | Path = "out
           tile_cache: Path = TILE_CACHE, fly: FlyLink | None = None) -> ThreadingHTTPServer:
     tiles = dict(TILE_SOURCES)
     tiles.update(parse_tile_source(spec) for spec in extra_tiles)
-    fly = fly or FlyLink(Path(out_root))
+    fly = fly or FlyLink(Path(out_root), book=MissionBook(Path(out_root)))
+    video = VideoRelay()
     server = ThreadingHTTPServer((host, port), make_handler(Path(out_root), RunCache(Path(runs_dir)),
                                                             BatteryStore(Path(battery_log), battery_reader), tiles,
                                                             ortho_store(Path(orthophotos)),
-                                                            WmsStore(Path(wms_layers), tile_cache), fly))
-    server.fly = fly  # so the caller can let go of the drone on shutdown
+                                                            WmsStore(Path(wms_layers), tile_cache), fly, video))
+    server.fly, server.video = fly, video  # so the caller can let go of the drone on shutdown
     return server

@@ -185,3 +185,29 @@ def tiny_mission(home: LatLon, target: LatLon, altitude_m: float = 10.0) -> list
         waypoint(target, altitude_m, h),
         MissionItem(Cmd.NAV_LAND),
     ]
+
+
+def refly_line_mission(items: Sequence[MissionItem], line: int, here: tuple[float, float]) -> list[MissionItem]:
+    """A mission for a drone in the air: fly photo line `line` (0-based) again from its start, then the rest.
+
+    For a plan paused and flown away from by hand: the drone itself would only resume
+    straight to the line's end. It keeps the original's setup (speed, gimbal, view and
+    photo mode), then a waypoint at `here` (lat, lon) at the line's altitude, so any
+    climb or descent happens on the spot before flying sideways, then everything
+    from the line's start waypoint on.
+    """
+    starts = [i for i, it in enumerate(items) if it.command == Cmd.IMAGE_START_CAPTURE]
+    if not 0 <= line < len(starts):
+        raise ValueError(f"no photo line {line + 1} in this mission")
+    navs = [i for i in range(starts[line]) if items[i].command == Cmd.NAV_WAYPOINT]
+    if not navs:
+        raise ValueError("the photo line has no start waypoint")
+    line_start = navs[-1]
+    first_line_start = max(i for i in range(starts[0]) if items[i].command == Cmd.NAV_WAYPOINT)
+    setup = [it for it in items[:first_line_start]
+             if it.command not in NAV_COMMANDS
+             and it.command not in (Cmd.IMAGE_START_CAPTURE, Cmd.IMAGE_STOP_CAPTURE)]
+    w = items[line_start]
+    on_the_spot = MissionItem(Cmd.NAV_WAYPOINT, frame=w.frame, p1=w.p1, p2=w.p2, p3=w.p3, p4=w.p4,
+                              x=here[0], y=here[1], z=w.z)
+    return [*setup, on_the_spot, *items[line_start:]]

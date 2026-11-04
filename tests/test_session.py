@@ -20,12 +20,20 @@ def _mission():
 class FakeDrone:
     """Stands in for drone.control: replays statuses, records the commands sent."""
 
-    def __init__(self, statuses):
+    def __init__(self, statuses, before=None):
         self.statuses = list(statuses)
+        self.before = before or Status(flying_state="landed", plan_state="stopped")  # until the plan starts
         self.calls = []
 
     def read_status(self, dev):
+        if "start_plan" not in self.calls:
+            return self.before
         return self.statuses.pop(0) if len(self.statuses) > 1 else self.statuses[0]
+
+    def stop_plan(self, dev):
+        self.calls.append("stop_plan")
+        if "start_plan" not in self.calls:
+            self.before = Status(flying_state="landed", plan_state="stopped")
 
     def __getattr__(self, name):  # start_plan, pause_plan, stop_photos, ...
         return lambda dev, *a: self.calls.append(name)
@@ -45,8 +53,8 @@ def _s(flying="flying", plan="playing", item=None, battery=90, rth="available"):
                   position=HOME, home=HOME)
 
 
-def _session(tmp_path, statuses):
-    fake = FakeDrone(statuses)
+def _session(tmp_path, statuses, before=None):
+    fake = FakeDrone(statuses, before)
     return FlightSession(None, _mission(), tmp_path, ctl=fake, clock=Clock()), fake
 
 
@@ -119,3 +127,25 @@ def test_toggle_does_nothing_when_no_plan_runs(tmp_path):
     sess.start()
     sess.step()
     assert sess.toggle_pause() is None and fake.calls == ["start_plan"]
+
+
+def test_a_paused_plan_left_on_the_drone_is_stopped_before_takeoff(tmp_path):
+    # Return home pauses the plan and landing doesn't clear it; Start would resume it from the
+    # ground, flying straight to its next waypoint while climbing (the slanted climb).
+    left = Status(flying_state="landed", plan_state="paused", mission_item=27)
+    sess, fake = _session(tmp_path, [_s(item=1)], before=left)
+    sess.start()
+    assert fake.calls == ["stop_plan", "start_plan"]
+    assert any("starts from the beginning" in e.text for e in sess.events)
+
+
+def test_refuses_to_start_if_the_paused_plan_wont_stop(tmp_path):
+    import pytest
+    from drone.upload import DroneError
+
+    left = Status(flying_state="landed", plan_state="paused", mission_item=27)
+    sess, fake = _session(tmp_path, [_s()], before=left)
+    fake.stop_plan = lambda dev: fake.calls.append("stop_plan")  # the drone ignores it
+    with pytest.raises(DroneError, match="resume from the middle"):
+        sess.start()
+    assert "start_plan" not in fake.calls

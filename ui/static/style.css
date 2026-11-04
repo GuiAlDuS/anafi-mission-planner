@@ -534,3 +534,143 @@ table.runs { border-collapse: collapse; width: 100%; font-size: 14px; }
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; animation: none !important; }
 }
+
+/* ---------- Fly: one survey flight, read at a glance outdoors ---------- */
+[hidden] { display: none !important; }
+.fly { display: flex; flex-direction: column; }
+.fly .panel-top { background: var(--surface); border-bottom: 2px solid var(--ink); }
+
+/* Instrument strip: the battery is a meter (it has a limit that matters), the rest are numbers. */
+.instruments {
+  display: grid; grid-template-columns: 1.45fr 1fr 1fr 1fr; gap: 10px; align-items: start;
+  padding: 12px 18px 8px;
+}
+.instruments .stat b { font-size: 28px; }
+.instruments small { display: block; white-space: nowrap; }
+.battery-meter small { color: var(--muted); font-size: 13px; }
+.meter-head { display: flex; align-items: baseline; gap: 6px; }
+.meter-head b { font: 700 28px/1 var(--cond); font-variant-numeric: tabular-nums; }
+.meter-word { font: 600 13px/1 var(--sans); color: var(--muted); white-space: nowrap; }
+.meter-word.is-ok { color: var(--ok); }
+.meter-word.is-tight { color: var(--tight); }
+.meter-word.is-low { color: var(--danger); }
+.meter-track {
+  position: relative; height: 8px; margin: 4px 0 2px; border-radius: 4px;
+  background: #E3E8E6; overflow: visible;
+}
+.meter-fill { height: 100%; width: 0; border-radius: 5px; background: var(--muted); }
+.meter-fill.is-ok { background: var(--ok); }
+.meter-fill.is-tight { background: var(--tight); }
+.meter-fill.is-low { background: var(--danger); }
+.meter-min { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--ink); box-shadow: 0 0 0 1px var(--surface); }
+
+.flight-line { padding: 0 18px 12px; }
+.fly-state { margin: 2px 0 8px; font: 600 17px/1.25 var(--cond); }
+.line-progress { display: flex; gap: 2px; height: 12px; }
+.line-progress:empty { display: none; }
+.line-seg { flex: 1; border-radius: 3px; background: #E3E8E6; }
+.line-seg.is-done { background: var(--ink); }
+.line-seg.is-now { background: var(--route); }
+
+.link-state { font-size: 14px; color: var(--muted); }
+.link-state.is-on { color: var(--ok); }
+.link-state.is-lost { color: var(--danger); font-weight: 600; }
+.link-choice { grid-template-columns: repeat(3, 1fr); }
+.link-choice .chip span { font: 600 15px/1.1 var(--cond); min-height: 38px; }
+.fly-host { margin-top: 8px; grid-template-columns: 1fr 150px; }
+.fly-host input { text-align: left; font: 500 15px/1.2 var(--sans); }
+.fly-actions { display: flex; gap: 8px; margin-top: 10px; }
+.mission-pick { display: grid; grid-template-columns: 1fr 110px; gap: 8px; }
+.mission-pick select {
+  min-width: 0; padding: 8px; border: 1px solid var(--rule); border-radius: 5px; background: var(--surface);
+}
+
+/* Checks: every row says what it is in words, the mark only repeats it. */
+.checks { list-style: none; margin: 0 0 12px; padding: 0; display: grid; gap: 6px; }
+.checks li { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; font-size: 14px; }
+.checks li::before {
+  content: ""; width: 18px; height: 18px; margin-top: 1px; border-radius: 50%;
+  display: grid; place-items: center; font: 700 12px/18px var(--sans); text-align: center; color: #fff;
+}
+.checks .is-bad::before { content: "✕"; background: var(--danger); }
+.checks .is-ok::before { content: "✓"; background: var(--ok); }
+.checks .is-wait::before { content: "…"; background: var(--muted); }
+
+/* Hold to take off: the fill is the confirmation, and it answers the press. */
+.hold {
+  position: relative; width: 100%; min-height: 52px; padding: 0 16px; overflow: hidden;
+  border: 2px solid var(--ink); border-radius: 8px; background: var(--surface);
+  font: 700 20px/1 var(--cond); cursor: pointer; touch-action: none; user-select: none;
+}
+.hold-fill { position: absolute; inset: 0; width: 0; background: var(--ink); }
+.hold-label { position: relative; mix-blend-mode: difference; color: #fff; }
+.hold:disabled { border-color: var(--rule); color: var(--muted); cursor: not-allowed; }
+.hold:disabled .hold-label { mix-blend-mode: normal; color: var(--muted); }
+
+.notes { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 14px; max-height: 210px; overflow-y: auto; }
+.notes li { display: grid; grid-template-columns: 62px 1fr; gap: 8px; }
+.notes time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.notes .is-error, .notes .is-warning { color: var(--danger); }
+.notes .is-done { font-weight: 600; }
+.notes:empty::before { content: "Nothing yet."; color: var(--muted); }
+
+/* Controls stay at the bottom of the panel, always in reach. */
+.controls {
+  position: sticky; bottom: 0; margin-top: auto; padding: 12px 18px 14px;
+  background: var(--panel); border-top: 2px solid var(--ink);
+}
+.rth {
+  display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; min-height: 60px;
+  border: 0; border-radius: 8px; background: var(--ink); color: #fff;
+  font: 700 24px/1 var(--cond); cursor: pointer;
+}
+.rth-mark {
+  width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--area); color: var(--ink); font: 700 18px/1 var(--cond); box-shadow: 0 0 0 2px #fff;
+}
+.rth:hover:not(:disabled) { background: #24352E; }
+.rth:disabled { background: var(--rule); color: var(--muted); cursor: not-allowed; }
+.rth:disabled .rth-mark { background: #fff; color: var(--muted); box-shadow: none; }
+.control-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-top: 8px; }
+.control-row .secondary { padding: 10px 6px; }
+.controls-note { margin: 8px 0 0; color: var(--muted); font-size: 12px; line-height: 1.35; }
+
+/* On the map */
+.drone-mark { width: 22px; height: 22px; border-radius: 50%; background: var(--route);
+  border: 3px solid #fff; box-shadow: 0 0 0 2px var(--ink); }
+.drone-mark.is-stale { background: var(--muted); }
+.resume { margin: 0 0 12px; padding: 10px 12px; border-left: 4px solid var(--route); background: var(--surface); }
+.resume p { margin: 0 0 8px; font-size: 14px; }
+.resume .primary { width: 100%; }
+.refly-choice { margin-bottom: 10px; padding: 10px 12px; border-left: 4px solid var(--route); background: var(--surface); }
+.refly-choice p { margin: 0 0 8px; font-size: 14px; }
+.refly-choice .primary, .refly-choice .secondary { width: 100%; }
+.refly-choice .secondary { margin-top: 6px; }
+.control-row:has(#fly-pause[hidden]) { grid-template-columns: repeat(2, 1fr); }
+
+/* Live camera: a picture-in-picture over the map, beside the panel */
+.state-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.state-row .text-button { white-space: nowrap; font-size: 14px; }
+.state-row .text-button:disabled { color: var(--rule); cursor: not-allowed; text-decoration: none; }
+.camera-pip {
+  position: fixed; top: 12px; right: calc(var(--panel-w) + 12px); z-index: 1000; margin: 0;
+  width: 320px; background: var(--ink); border-radius: 8px; overflow: hidden;
+  box-shadow: 0 0 0 2px #fff;
+}
+.camera-pip.is-large { width: min(720px, calc(100vw - var(--panel-w) - 24px)); }
+.camera-frame { position: relative; aspect-ratio: 4 / 3; background: #000; }
+.camera-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.camera-frame img:not([src]) { visibility: hidden; }
+.camera-msg {
+  position: absolute; inset: auto 0 0 0; margin: 0; padding: 6px 10px;
+  background: #13201BCC; color: #fff; font-size: 13px;
+}
+.camera-pip figcaption {
+  display: flex; justify-content: space-between; align-items: center; padding: 5px 10px;
+  color: #fff; font: 600 14px/1.2 var(--cond);
+}
+.camera-pip .text-button { color: #ffffffcc; font: 500 13px/1.2 var(--sans); }
+.camera-pip .text-button:hover { color: #fff; }
+.drone-mark2 { width: 40px; height: 40px; }
+.drone-arrow { width: 40px; height: 40px; display: block; overflow: visible; transition: transform 0.4s linear; }
+@media (prefers-reduced-motion: reduce) { .drone-arrow { transition: none; } }

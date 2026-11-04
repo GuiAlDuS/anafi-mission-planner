@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 from planner.geo import LatLon, heading_deg
-from planner.grid import SurveySettings, generate_grid
+from planner.grid import SurveyLine, SurveySettings, generate_grid
 from planner.mavlink import (Cmd, Frame, MissionItem, format_mission, parse_mission, survey_mission,
                              tiny_mission, validate_mission)
 
@@ -165,3 +165,25 @@ def test_no_mission_climbs_or_descends_while_moving_sideways(kind, area, home):
         items = survey_mission(g.lines, home, s.altitude_m, s.speed_ms, g.photo_spacing_m,
                                end_action=kind.split("_")[1])
     assert _slanted_legs(items, home) == []
+
+
+def test_refly_line_mission_climbs_on_the_spot_then_flies_the_whole_line():
+    from planner.mavlink import Cmd, refly_line_mission
+    from drone.control import photo_lines
+
+    home = LatLon(48.879455, 2.370077)
+    lines = [SurveyLine(LatLon(48.8796, 2.3697), LatLon(48.8800, 2.3697)),
+             SurveyLine(LatLon(48.8800, 2.3698), LatLon(48.8796, 2.3698)),
+             SurveyLine(LatLon(48.8796, 2.3699), LatLon(48.8800, 2.3699))]
+    items = survey_mission(lines, home, 25, 5, 5.8)
+    here = (48.87985, 2.37010)  # flown away by hand, low
+    new = refly_line_mission(items, 1, here)
+    kinds = [it.command for it in new]
+    assert Cmd.NAV_TAKEOFF not in kinds  # the drone is already in the air
+    for setup in (Cmd.DO_CHANGE_SPEED, Cmd.DO_MOUNT_CONTROL, Cmd.SET_STILL_CAPTURE_MODE):
+        assert setup in kinds[:kinds.index(Cmd.NAV_WAYPOINT)]
+    navs = [it for it in new if it.command == Cmd.NAV_WAYPOINT]
+    assert (navs[0].x, navs[0].y, navs[0].z) == (*here, 25)  # altitude first, on the spot
+    assert (navs[1].x, navs[1].y) == (lines[1].start.lat, lines[1].start.lon)  # then line 2's start
+    assert len(photo_lines(new)) == 2  # lines 2 and 3 left
+    assert not validate_mission(new)
