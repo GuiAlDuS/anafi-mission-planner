@@ -43,6 +43,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         "parrot-ue4-landscape-mountains=${SPHINX_VERSION}" \
     && rm -rf /var/lib/apt/lists/*
 
+# QDroneCtrl: Parrot's desktop app to fly the simulated drone with the keyboard,
+# with the front camera view (sim/anafi.sh keyboard).
+RUN apt-get update && apt-get install -y --no-install-recommends parrot-tools-qdronectrl \
+    && rm -rf /var/lib/apt/lists/*
+
 # Sphinx refuses to run as root. "sim" gets uid 1000 (usually the host user) so
 # run logs in sim/cache/runs stay owned by you; firmwared group = control socket.
 RUN (userdel -r ubuntu 2>/dev/null || true) \

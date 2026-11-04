@@ -56,6 +56,7 @@ What the simulator taught us:
 - x86_64 Linux with Docker
 - an NVIDIA graphics card and the NVIDIA Container Toolkit (`--gpus all`)
 - the kernel headers for your running kernel, to build Parrot's `ulogger` module
+- for QDroneCtrl's camera view: a firewall rule for the simulator's subnet (below)
 - about 12 GB of disk: Sphinx and the "landscape-mountains" 3D world, plus a 40 MB
   firmware download
 
@@ -67,7 +68,19 @@ sim/up.sh                                  # first run builds ulogger and tells 
 sudo insmod sim/cache/ulogger/ulogger-$(uname -r).ko
 sim/up.sh                                  # starts the container (downloads the firmware once)
 sim/anafi.sh ::pose=lake                   # starts the 3D world and the drone
+sim/anafi.sh keyboard                      # optional: fly it with the keyboard (QDroneCtrl)
 ```
+
+**Firewall:** the drone sends video and telemetry to the PC unprompted, so a
+firewall that blocks incoming traffic (firewalld's `block` or `public` zones)
+leaves QDroneCtrl without camera or instruments, although its commands work.
+Trust only the simulator's private, PC-internal subnet:
+
+```bash
+sudo firewall-cmd --permanent --zone=trusted --add-source=10.202.0.0/24 && sudo firewall-cmd --reload
+```
+
+In QDroneCtrl press **Connect**; **Tools > Options** lists the keys.
 
 Then use the normal commands with `--host 10.202.0.1`:
 
@@ -83,13 +96,44 @@ missions small. Stop with `sim/anafi.sh stop` (drone) and `sim/down.sh`
 (container). `sim/anafi.sh status` says what's running. The 3D window shows the
 drone, and the web dashboard is at http://localhost:9002.
 
+## Fly it with your Skycontroller 3 and FreeFlight 6
+
+Tested 2026-11-03: Skycontroller 3 (fw 1.8.1) and FreeFlight 6.7.5 on iOS both
+work with the simulated drone (fw 1.10.4). The PC's Wi-Fi card becomes the
+simulated drone's access point, so the PC needs another way online (Ethernet):
+
+```bash
+sim/anafi.sh check-wifi wlan0               # only checks: AP mode, another connection online
+sim/anafi.sh start --wifi wlan0 ::pose=lake # prints the drone's network, e.g. Anafi_PC_b8d232
+```
+
+The PC's Wi-Fi is off until `sim/anafi.sh stop`. The network is on 2.4 GHz
+channel 6 (the Skycontroller 3 has no 5 GHz; `SIM_WIFI_CHANNEL` picks another
+one) and has no password.
+
+1. **Phone first.** With the Skycontroller off, join the drone's network
+   (`Anafi_PC_…`) in the iPhone's Wi-Fi settings and open FreeFlight 6. It
+   finds the drone and shows its camera; you can already fly from the phone.
+2. **Then the Skycontroller.** Switch it on and plug it into the phone.
+   FreeFlight switches to the controller and loses the drone for a while: the
+   controller is looking for the drone it was paired with. **Wait.** About 6
+   minutes later the controller joined the simulated drone's network by itself
+   (FreeFlight hands it over), and the sticks, buttons and camera view work.
+
+Afterwards the controller is paired with the simulated drone. Pair it with a
+real Anafi again with the USB cable (controller USB-A to drone USB-C).
+
+The simulated drone behaves like the real one when the link drops: with no
+controller left it starts return home after 1 s.
+
 ## ⚠️ Your Wi-Fi
 
 By default Sphinx takes the PC's Wi-Fi card and turns it into the drone's
 access point, which cuts the PC's internet if Wi-Fi is how it gets online.
 `sim/anafi.sh` always passes `wifi_iface=` (empty) so this can't happen, and
-stops the simulation if the PC's Wi-Fi cards change. Launch the drone through it,
-never with a bare `sphinx` command.
+stops the simulation if the PC's Wi-Fi cards change. The only exception is
+`--wifi CARD` above, which refuses unless another connection is online. Launch
+the drone through `sim/anafi.sh`, never with a bare `sphinx` command.
 
 If it happens anyway: `sim/down.sh`, then
 `sudo modprobe -r iwlmvm iwlwifi && sudo modprobe iwlwifi` (Intel cards).
@@ -115,4 +159,5 @@ while setting this up, all fixed in `sim/`:
 | `Smartbattery is defective` | normal for about a minute after boot |
 | 3D world quits: `Failed to load Vulkan Driver` | `libvulkan1` missing |
 | Sphinx and the 3D world wait for each other forever | the world package doesn't match the Sphinx version (Parrot's "meadow" is still a 2.15.1 build); the Dockerfile pins the world to 2.25.2 |
+| QDroneCtrl flies the drone but shows no camera and 0 % battery | the firewall drops the drone's video and telemetry: trust `10.202.0.0/24` (see above) |
 | The drone sinks forever when landing | the "empty" world only has ground at the spawn point |
