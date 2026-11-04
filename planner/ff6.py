@@ -7,8 +7,8 @@ layout of plans the app saved itself.
 
 The camera is set by actions in the plan, which override the app's camera
 control once the plan starts. Given `photo_period_s`, the plan tilts the camera
-straight down at its first waypoint and takes time-lapse photos from the start
-of line 1 to the end of the last line (format from a plan FreeFlight re-saved,
+straight down at its first waypoint and at every line start, and takes
+time-lapse photos from the start of line 1 to the end of the last line (format from a plan FreeFlight re-saved,
 flown in the simulator 2026-11-04: 104 photos at -90 deg). The tilt goes on the
 first waypoint, not on takeoff: users report that a tilt in the takeoff actions
 makes firmware 1.8.x hover instead of flying the plan. FreeFlight's plan
@@ -83,8 +83,18 @@ def camera_actions(n_points: int, photo_period_s: float | None = None, first_lin
     """(takeoff actions, actions per waypoint).
 
     Video (no period): start at takeoff, stop at the last waypoint. Photos: tilt
-    down at waypoint 0, time lapse from `first_line` to `last_line` (indexes of
+    down at waypoint 0 and again at every line start (`first_line`, then every
+    other waypoint), time lapse from `first_line` to `last_line` (indexes of
     the first line's start and the last line's end).
+
+    Simulator findings (2026-11-04, fw 1.10.4): a stick push pauses the plan,
+    and play resumes the route without replaying earlier actions. The repeated
+    tilt brings the camera back down after a manual tilt, at no extra hover
+    time. Photo commands must NOT be repeated: a start while photos run stops
+    them, and repeated stop/start pairs (at every waypoint or every line start)
+    fell into a cycle of skipped starts, 20 s stop timeouts and a skipped final
+    stop (whole lines without photos, camera still shooting after landing).
+    After a pause, photos sometimes stopped and sometimes kept going.
     """
     per_wp: list[list[dict]] = [[] for _ in range(n_points)]
     if photo_period_s is None:
@@ -95,7 +105,11 @@ def camera_actions(n_points: int, photo_period_s: float | None = None, first_lin
     last_line = n_points - 1 if last_line is None else last_line
     if not 0 <= first_line < last_line < n_points:
         raise ValueError("photos must start before they stop, within the route")
-    per_wp[0].append({"type": "Tilt", "angle": NADIR_TILT_DEG, "speed": TILT_SPEED_DEG_S})
+    tilt = {"type": "Tilt", "angle": NADIR_TILT_DEG, "speed": TILT_SPEED_DEG_S}
+    per_wp[0].append(dict(tilt))
+    for i in range(first_line, last_line, 2):  # line starts: the route alternates line start, line end
+        if i:
+            per_wp[i].append(dict(tilt))
     per_wp[first_line].append({"type": "ImageStartCapture", "period": round(photo_period_s, 2),
                                "resolution": JPEG_RECTILINEAR, "nbOfPictures": 0})
     per_wp[last_line].append({"type": "ImageStopCapture"})

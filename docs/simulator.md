@@ -21,6 +21,10 @@ releases Parrot supports.
 | Pause, resume, stop, return home (`fly`'s `p`, `s`, `r` keys) | ✅ pause and stop hover within 1 s; resume continues the line; return home flies back and hovers 2 m above home |
 | FreeFlight 6 plan from our planner (Send to FreeFlight, flown from the phone), 8 lines at 25 m, 5 m/s (2026-11-04) | ✅ vertical climb over home (0.1 m drift), lines at 25.0 m, back over home, vertical descent to 5 m (within 1.1 m of home) and hover; about 2:30 from takeoff to hover (3:31 estimated with landing). The plan's video actions overrode the app's camera control: one 2.5 min video |
 | Same plan with photo actions: tilt −90° at the first waypoint, time lapse every 1.16 s (5.8 m at 5 m/s) (2026-11-04) | ✅ 104 photos, all at −90°, spacing 5.5 m (drone flew 4.7 m/s), front/side overlap 81/82 %. Now the default for Send to FreeFlight |
+| Stick push during a FreeFlight plan: right stick sideways ~2 s on line 2 (2026-11-04) | ✅ the drone **pauses** the plan at once (`PCMD_THRESHOLD_REACHED`, flight plan `pause`), hovers and gives you control; return home from the pause worked |
+| Resume after the stick pause (play button) | ✅ the route continues to the waypoint it was heading for, and the camera tilts back down at the next line start. ❌ photos stay off: the drone stops photo capture when it pauses and doesn't restart it |
+| Repeating the photo start at every waypoint, or at every line start, to restart photos after a resume | ❌ a start while photos run stops them; stop/start pairs fell into a cycle of skipped starts and 20 s stop timeouts (whole lines without photos), and the final stop was skipped (camera still shooting after landing). Photos are started once |
+| Final FreeFlight layout: tilt at every line start, photos started once at line 1, stopped at the last line end | ✅ 114 photos, all at −90°, along all 8 lines, spacing 5.6 m (front 81 %), ~1 s hovers, no errors; about 3 min airborne |
 | 7-line survey at 25 m, 5 m/s, distance-triggered photos (`50001`, `2000`/`2001`) | ✅ 63 photos in GPS-lapse mode, spacing 5.9 m (5.8 m planned), front/side overlap 80/83 % as planned, camera at −90°, 3:00 flown vs 3:20 estimated |
 
 What the simulator taught us:
@@ -120,13 +124,20 @@ one) and has no password.
    FreeFlight now talks through the controller, which is still searching for
    the real drone it was paired with, so the drone disappears from the app.
    Tell the controller which network to join: tap the **controller box** on
-   FreeFlight's homepage, then **Connect**. FreeFlight shows the Wi-Fi
-   networks the controller can see. Choose the PC's `Anafi_PC_…` network.
+   FreeFlight's homepage, then **Connect**, then **Enter Wi-Fi password**.
+   FreeFlight shows the Wi-Fi networks the controller can see. Choose the
+   PC's `Anafi_PC_…` network.
    Once the controller joins it, the sticks, buttons and camera view all work
    with the simulated drone.
 
 Afterwards the controller is paired with the simulated drone. Pair it with a
 real Anafi again with the USB cable (controller USB-A to drone USB-C).
+
+The network name changes every time the drone restarts (`sim/anafi.sh stop`,
+then `start`): join the new `Anafi_PC_…` network from the phone and the
+controller each time. After a stop the Wi-Fi card may come back under another
+name (`eth0` instead of `wlan0`): `--wifi` takes whatever name it has now.
+Restarting is also how to get a full battery: the drone starts at 100 %.
 
 The simulated drone behaves like the real one when the link drops: with no
 controller left it starts return home after 1 s.

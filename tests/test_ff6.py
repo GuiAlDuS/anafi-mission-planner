@@ -87,22 +87,36 @@ def _photo_plan():
 def test_photo_plan_matches_freeflight():
     ref, (_, files) = _photo_plan()
     ours = _rows(files["flightPlan.mavlink"].decode())
-    assert [r[3] for r in ours] == [r[3] for r in ref]  # same commands in the same order
-    for a, b in zip(ours, ref):
+    # FreeFlight's reference tilts once, over home; ours tilts again at every line start.
+    # Without those extra tilts the commands are the same.
+    extra = [i for i, r in enumerate(ours) if r[3] == "2800" and i > 3]
+    assert len(extra) == 8  # one per line of the 8-line reference plan
+    trimmed = [r for i, r in enumerate(ours) if i not in extra]
+    assert [r[3] for r in trimmed] == [r[3] for r in ref]  # same commands in the same order
+    for a, b in zip(trimmed, ref):
         if a[3] in ("2800", "2000", "2001", "50000"):
             assert a[4:8] == b[4:8], (a, b)
 
 
-def test_photo_plan_tilts_down_at_first_waypoint_not_takeoff():
+def test_photo_plan_tilts_down_and_starts_photos_once():
     _, (_, files) = _photo_plan()
     plan = json.loads(files["savedPlan.json"])["plan"]
     wps = plan["wayPoints"]
+    tilt = {"type": "Tilt", "angle": -90, "speed": 180}
     assert plan["takeoff"] == []  # a tilt at takeoff makes firmware 1.8.x hover instead of flying
-    assert wps[0]["actions"] == [{"type": "Tilt", "angle": -90, "speed": 180}]
-    assert wps[1]["actions"][0]["type"] == "ImageStartCapture" and wps[1]["actions"][0]["period"] == 1.16
+    assert wps[0]["actions"] == [tilt]  # over home, before line 1
+    assert wps[1]["actions"][0] == tilt and wps[1]["actions"][1]["type"] == "ImageStartCapture"
+    assert wps[1]["actions"][1]["period"] == 1.16
+    for i in range(3, len(wps) - 3, 2):  # every later line start: tilt back down, nothing else
+        assert wps[i]["actions"] == [tilt], i
+    for i in range(2, len(wps) - 3, 2):  # line ends
+        assert wps[i]["actions"] == [], i
     assert wps[-3]["actions"] == [{"type": "ImageStopCapture"}]  # end of the last line
-    assert all(not w["actions"] for w in wps[2:-3] + wps[-2:])
-    assert not any("Video" in a["type"] for w in wps for a in w["actions"])
+    assert wps[-2]["actions"] == wps[-1]["actions"] == []
+    kinds = [a["type"] for w in wps for a in w["actions"]]
+    # Photo commands exactly once each: repeated starts toggle and jam the camera (simulator).
+    assert kinds.count("ImageStartCapture") == 1 and kinds.count("ImageStopCapture") == 1
+    assert not any("Video" in k for k in kinds)
 
 
 def test_photo_period_must_be_positive():

@@ -53,6 +53,21 @@ while an iPhone is connected). Then on the phone:
    end of the last one, comes back over home and descends to 5 m: land with
    the controller.
 
+**Taking over:** pushing a stick during the plan pauses it at once and gives
+you control (simulator, 2026-11-04). FreeFlight then offers Land, and a play
+button to resume; return home also works.
+
+- **Resume** (play) carries on to the waypoint the drone was heading for, and
+  the camera tilts back down at the next line start.
+- **Photos stay off after a resume.** The drone switches the photo capture off
+  when it pauses and doesn't switch it back on. The rest of the plan is flown
+  without photos. After a takeover, return home and fly the remaining lines
+  as a new plan, or fly with `anafi-drone fly` from a laptop instead.
+- Repeating the photo start in the plan doesn't work around it: a photo start
+  while photos are running stops them, and repeated stop/start pairs jammed the
+  camera (skipped starts, 20 s stop timeouts, whole lines without photos, and
+  the camera still shooting after landing).
+
 ### Camera: set by the plan
 
 The plan's own actions set the camera, and they override FreeFlight's camera
@@ -63,7 +78,8 @@ whatever the camera control said. Our plans carry:
 | Where | Action in `savedPlan.json` | FreeFlight sends |
 |---|---|---|
 | First waypoint (over home, survey altitude) | `Tilt`, angle −90, speed 180 | `2800` (panorama), vertical angle −90 at 180°/s |
-| Start of line 1 | `ImageStartCapture`, period = photo spacing ÷ speed, rectilinear JPEG (`resolution` 12.58) | `2000`, interval in s |
+| Start of line 1 | `Tilt` as above, then `ImageStartCapture`, period = photo spacing ÷ speed, rectilinear JPEG (`resolution` 12.58) | `2800`, then `2000` with the interval in s |
+| Start of every later line | `Tilt` as above | `2800` |
 | End of the last line | `ImageStopCapture` | `2001` |
 
 - **Time lapse, not GPS lapse.** The only photo action seen in plan files
@@ -72,8 +88,10 @@ whatever the camera control said. Our plans carry:
   (front overlap 81 % instead of 80 %). Photos are also taken on the short
   hops between lines.
 - **The tilt is relative** to the current tilt (−90 from level = straight
-  down), and it goes on the first waypoint: users report that a tilt in the
-  takeoff actions makes firmware 1.8.x hover instead of flying the plan.
+  down), but the gimbal stops at straight down, so repeating it is safe: it
+  brings the camera back down after a manual tilt, at no extra hover time.
+  It goes on waypoints, not takeoff: users report that a tilt in the takeoff
+  actions makes firmware 1.8.x hover instead of flying the plan.
 - In the app, these actions are in the plan's action menu: the button beside
   the plan list whose icon is a page with a "+".
 - Reference: `tests/data/ff6_sim_photos.mavlink`, our plan as FreeFlight re-saved it.
