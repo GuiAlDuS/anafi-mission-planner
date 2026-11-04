@@ -50,7 +50,7 @@ ways:
 |---|---|
 | Planner, `.mavlink` writer, time and battery estimate | ✅ checked against real Pix4Dcapture flights |
 | Upload to the drone over HTTP | ✅ works on the real drone (fw 1.8.2) |
-| FreeFlight 6 transfer | ✅ FreeFlight lists and opens the plans · ⚠️ the first flight crashed; fixed, not flown since |
+| FreeFlight 6 transfer | ✅ FreeFlight lists and opens the plans · ⚠️ the first flight crashed; fixed and flown in the simulator, not yet on a real drone |
 | GUI: plan, missions, map layers, batteries | ✅ |
 | Battery and drone health checks | ✅ ground checks run on the real drone |
 | Laptop flight control (Olympe) | 🔧 built; start, pause, stop and return home await a field test |
@@ -62,15 +62,33 @@ Missions, uploads and flight control also run in [Parrot Sphinx](docs/simulator.
 which runs the Anafi's real firmware (1.10.4; real drones are on 1.8.2) in a 3D
 world:
 
+**Laptop path** (`anafi-drone fly`, our `.mavlink`, photos by distance):
+
 | Test | Result |
 |---|---|
-| Tiny mission: takeoff, vertical climb, one waypoint, land | ✅ flown with `anafi-drone fly`, end to end |
+| Tiny mission: takeoff, vertical climb, one waypoint, land | ✅ flown end to end |
 | Pause, resume, stop, return home | ✅ each one does what `fly`'s keys promise |
 | 7-line survey with distance-triggered photos | ✅ 63 photos at the planned spacing and overlap, camera straight down, 3:00 flown vs 3:20 estimated |
+| Pause halfway along a line, then resume | ✅ `fly` switches the photos back on for the rest of the line: 72 photos, 9 on every line, none missed |
 
-It already caught two bugs before they reached a real drone: the tiny test
-mission climbed on a slant (the cause of the first crash), and `fly` uploaded to
-the wrong address. Both are fixed. See [docs/simulator.md](docs/simulator.md)
+**Phone path** (Send to FreeFlight, flown from FreeFlight 6, photos by time):
+
+| Test | Result |
+|---|---|
+| 8-line survey sent from the GUI | ✅ vertical climb and descent over home, lines at the planned altitude |
+| Camera set by the plan itself | ✅ tilts straight down and takes photos, whatever the app's camera control says: 114 photos at −90°, 81 % front overlap |
+| Taking over with the sticks | ✅ the plan pauses at once and you fly it; resume (play) carries on, but the drone doesn't restart the photos |
+| Finish the rest with "Start at line" | ✅ flies only the remaining lines with the same grid: lines 4–6, 26 photos |
+| Repeating photo commands in the plan, to restart photos after a resume | ❌ jams the camera (skipped lines, 20 s stalls), so plans start photos once |
+
+The full list, with what each test taught us, is in
+[docs/simulator.md](docs/simulator.md#results-so-far-sphinx-2252-2026-11-03-to-04).
+
+It caught problems before they reached a real drone: the tiny test mission
+climbed on a slant (the cause of the first crash), `fly` uploaded to the wrong
+address, FreeFlight plans filmed video with the camera level, and photos stayed
+off after a resume. All are fixed, except that FreeFlight plans still can't
+restart photos after a resume: "Start at line" is the way round it. See [docs/simulator.md](docs/simulator.md)
 to run it yourself.
 
 > **Help wanted.** The author's drone was damaged in the first field test, so
@@ -126,6 +144,10 @@ uv run anafi-gui
 FreeFlight plans end hovering 5 m above the takeoff point: land with the
 controller.
 
+Photos are triggered by **time** here (every N seconds, from the planned
+spacing and speed); the laptop path below triggers them by **distance** (GPS
+lapse). [The two paths compared](docs/how_it_works.md#two-ways-to-fly-two-ways-to-take-photos).
+
 **If you take over:** pushing a stick pauses the plan and gives you control.
 Play resumes the route, but the drone doesn't restart the photos. Return home
 instead, then open the mission, set **Finish an interrupted survey → Start at
@@ -151,7 +173,9 @@ uv run anafi-drone --host 192.168.53.1 fly out/<name>/flight_1.mavlink
 `fly` uploads the plan if needed and refuses to start without a GPS fix, a
 home point, enough battery, or if the mission exceeds the drone's limits. Then
 it asks you to type `yes`. While flying: `r` return home, `p` pause/resume,
-`s` stop (hover), `q` leave the view.
+`s` stop (hover), `q` leave the view. Photos are triggered by **distance** (GPS
+lapse) and switched on for each line. After `p` pause and `p` resume, `fly`
+switches them back on for the rest of the paused line, so nothing is missed.
 
 Start with a tiny test mission (takeoff, vertical climb, one waypoint, land):
 

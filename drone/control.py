@@ -19,7 +19,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from planner.geo import LatLon, distance_m
-from planner.mavlink import NAV_COMMANDS, parse_mission, validate_mission
+from planner.mavlink import NAV_COMMANDS, Cmd, parse_mission, validate_mission
 
 from .upload import DRONE_HOST, SKYCONTROLLER_HOST, DroneError
 
@@ -204,6 +204,18 @@ class Mission:
         return max(distance_m(origin, LatLon(p[0], p[1])) for p in pts)
 
 
+def photo_lines(items: list) -> list[tuple[int, int]]:
+    """(start, stop) item indexes of each photo stretch: an image start and the stop after it."""
+    out, start = [], None
+    for i, it in enumerate(items):
+        if it.command == Cmd.IMAGE_START_CAPTURE and start is None:
+            start = i
+        elif it.command == Cmd.IMAGE_STOP_CAPTURE and start is not None:
+            out.append((start, i))
+            start = None
+    return out
+
+
 def load_mission(data: bytes) -> Mission:
     items = parse_mission(data.decode())
     return Mission(hashlib.md5(data).hexdigest(), items, validate_mission(items))
@@ -263,6 +275,17 @@ def start_plan(dev, uid: str, timeout_s: float = 10.0) -> None:
 def pause_plan(dev) -> None:
     from olympe.messages.common.Mavlink import Pause
     dev(Pause()).wait(5)
+
+
+def start_photos(dev) -> bool:
+    """Start taking photos in the camera's current mode (the mission's GPS lapse)."""
+    from olympe.messages.camera import take_photo
+    return dev(take_photo(cam_id=0)).wait(5).success()
+
+
+def stop_photos(dev) -> bool:
+    from olympe.messages.camera import stop_photo
+    return dev(stop_photo(cam_id=0)).wait(5).success()
 
 
 def stop_plan(dev) -> None:

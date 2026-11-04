@@ -32,6 +32,26 @@ Found while building this, on an Anafi 4K (fw 1.8.2), Skycontroller 3 (fw
   link-loss delay (1 s). Return home after a lost link isn't optional on the
   Anafi; FreeFlight has no switch for it.
 
+## Two ways to fly, two ways to take photos
+
+Both paths fly the same grid and use the photo spacing the planner computes
+from altitude and front overlap, but the drone is told to take photos in
+different ways (all verified in the simulator, 2026-11-03/04):
+
+| | Laptop: `anafi-drone fly` (our `.mavlink`) | Phone: Send to FreeFlight (FreeFlight plan) |
+|---|---|---|
+| Runs the mission | our program, through Olympe | FreeFlight 6 on the iPhone |
+| Photo trigger | **GPS lapse**: every N metres (`50001` mode 1 + `2000`) | **time lapse**: every N seconds, N = photo spacing ÷ speed |
+| If the drone flies slower or faster than planned | spacing stays at the planned metres | spacing follows the real speed (5.5 m for 5.8 m planned at 4.7 m/s) |
+| Photos switched on/off | at every line start and end | once: on at line 1, off at the end of the last line (repeating them jams the camera) |
+| Camera tilt | `205`, absolute −90°, after the climb | `Tilt` (sent as `2800`), relative, at the first waypoint and every line start |
+| After a pause and resume | nothing lost: `fly` switches the photos back on for the rest of the paused line (and off at its end); later lines start their own | photos stay off for the rest of the plan: fly the rest with "Start at line" |
+
+FreeFlight plans can't use GPS lapse: the only photo action seen in its plan
+files takes a time interval. The app's own camera control (photo/video, GPS
+lapse, Single) doesn't matter for either path, because the mission's camera
+commands override it once the plan starts.
+
 ## Coordinates, files and timing
 
 **Coordinates.** WGS84 latitude/longitude in and out. The grid is built in

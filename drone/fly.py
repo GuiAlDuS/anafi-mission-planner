@@ -3,6 +3,10 @@
 Keys while flying: r return home, p pause/resume, s stop (hover), q quit the
 view (the flight plan keeps running on the drone). The Skycontroller stays the
 primary way to take over.
+
+A pause switches the drone's photos off and a resume doesn't switch them back
+on, so after a resume inside a photo line `fly` takes over the photos for the
+rest of that line (see PhotoResume).
 """
 
 from __future__ import annotations
@@ -77,6 +81,41 @@ class RthWatch:
         return None
 
 
+class PhotoResume:
+    """Finish the photos of a line paused halfway (seen in the Sphinx simulator, fw 1.10.4).
+
+    A pause switches the photos off, and a resume doesn't switch them back on: the
+    mission's next photo start (the next line) does. So on a resume inside a photo
+    line we start them ourselves. The drone then skips that line's own photo stop
+    (its flight plan logic thinks they're off), and the next line's start would
+    toggle our photos off and stall 20 s, so we also stop them ourselves: when the
+    plan passes the line's stop item, or stops playing (pause, stop, return home).
+    """
+
+    def __init__(self, items: list):
+        self.lines = control.photo_lines(items)
+        self.stop_at: int | None = None  # our photos are on until this item
+
+    def on_resume(self, item: int | None) -> bool:
+        """After a resume: True if the photos must be started now."""
+        if item is None:
+            return False
+        for start, stop in self.lines:
+            if start <= item < stop:
+                self.stop_at = stop
+                return True
+        return False
+
+    def update(self, s: control.Status) -> bool:
+        """Every status read: True if our photos must be stopped now."""
+        if self.stop_at is None:
+            return False
+        if s.plan_state != "playing" or (s.mission_item is not None and s.mission_item >= self.stop_at):
+            self.stop_at = None
+            return True
+        return False
+
+
 def _confirm(prompt: str) -> bool:
     try:
         return input(prompt).strip().lower() == "yes"
@@ -120,6 +159,7 @@ def _watch(dev, mission: control.Mission, log_dir: Path) -> int:
     airborne = False
     quit_armed_at = 0.0
     rth = RthWatch()
+    photos = PhotoResume(mission.items)
     print(f"Started. Logging to {log_path}\n{KEYS}")
     with open(log_path, "w", newline="") as f, _keys() as read_key:
         log = csv.writer(f)
@@ -138,6 +178,8 @@ def _watch(dev, mission: control.Mission, log_dir: Path) -> int:
 
             if note := rth.update(s):
                 print("\n" + note)
+            if photos.update(s):
+                control.stop_photos(dev)
 
             if airborne and s.flying_state == "landed":
                 print(f"\nLanded after {t / 60:.1f} min, battery {start_battery} % -> {s.battery_pct} %.")
@@ -154,6 +196,9 @@ def _watch(dev, mission: control.Mission, log_dir: Path) -> int:
                 elif s.plan_state == "paused":
                     print("\nResuming.")
                     control.start_plan(dev, mission.uid)
+                    if photos.on_resume(s.mission_item):
+                        print("Photos back on for the rest of this line.")
+                        control.start_photos(dev)
             elif key == "s":
                 print("\nStopping the flight plan; the drone hovers. Fly it home with the Skycontroller or press r.")
                 control.stop_plan(dev)
@@ -161,6 +206,9 @@ def _watch(dev, mission: control.Mission, log_dir: Path) -> int:
                 if not airborne or s.flying_state == "landed" or time.monotonic() - quit_armed_at < 3:
                     print("\nLeaving the view." + (" The flight plan continues on the drone; "
                                                    "use the Skycontroller to take over." if airborne else ""))
+                    if photos.stop_at is not None:  # nobody would stop the photos we started
+                        print("Stopping the photos started after the resume; the next line starts its own.")
+                        control.stop_photos(dev)
                     return 0
                 quit_armed_at = time.monotonic()
                 print("\nThe drone is flying. Press q again within 3 s to leave the view anyway.")

@@ -13,7 +13,7 @@ releases Parrot supports.
 > for the Anafi 4K. Real drones are on 1.8.2. Results here are strong evidence,
 > not proof: still test on the real drone, with a tiny mission first.
 
-## Results so far (Sphinx 2.25.2, 2026-11-03)
+## Results so far (Sphinx 2.25.2, 2026-11-03 to 04)
 
 | Test | Result |
 |---|---|
@@ -24,6 +24,8 @@ releases Parrot supports.
 | Stick push during a FreeFlight plan: right stick sideways ~2 s on line 2 (2026-11-04) | ✅ the drone **pauses** the plan at once (`PCMD_THRESHOLD_REACHED`, flight plan `pause`), hovers and gives you control; return home from the pause worked |
 | Resume after the stick pause (play button) | ✅ the route continues to the waypoint it was heading for, and the camera tilts back down at the next line start. ❌ photos stay off: the drone stops photo capture when it pauses and doesn't restart it |
 | Repeating the photo start at every waypoint, or at every line start, to restart photos after a resume | ❌ a start while photos run stops them; stop/start pairs fell into a cycle of skipped starts and 20 s stop timeouts (whole lines without photos), and the final stop was skipped (camera still shooting after landing). Photos are started once |
+| `anafi-drone fly`, our `.mavlink` at 25 m: `p` pause halfway along line 2, `p` resume (2026-11-04) | ✅ the drone switches the photos off at the pause and the mission's next line start would only bring them back at line 3; `fly` now starts them on resume and stops them at the line end (the drone skips that stop, and the next start would otherwise jam). 72 photos at −90°, 9 on every line including the paused one, no camera errors. Without the explicit stop, line 3 got no photos and the drone stalled 20 s |
+| Olympe piloting command (`PCMD`, roll 30 for 2 s) during an Olympe-started plan | ❓ didn't pause the plan, unlike the Skycontroller's sticks under FreeFlight. Whether the real sticks pause a plan started by `fly` is still to check in the field; if they do, `p` resumes it |
 | Finish a survey from line 4 (GUI "Start at line", Send to FreeFlight), 40 m (2026-11-04) | ✅ saved as `sim_ff6_survey_from_line_4`; flew only lines 4–6, 26 photos at −90°, front/side overlap 80/84 %, clean stop at the last line |
 | Final FreeFlight layout: tilt at every line start, photos started once at line 1, stopped at the last line end | ✅ 114 photos, all at −90°, along all 8 lines, spacing 5.6 m (front 81 %), ~1 s hovers, no errors; about 3 min airborne |
 | 7-line survey at 25 m, 5 m/s, distance-triggered photos (`50001`, `2000`/`2001`) | ✅ 63 photos in GPS-lapse mode, spacing 5.9 m (5.8 m planned), front/side overlap 80/83 % as planned, camera at −90°, 3:00 flown vs 3:20 estimated |
