@@ -1,7 +1,7 @@
 """Photos after a resume (`anafi-drone fly`), from what the Sphinx simulator showed (fw 1.10.4)."""
 
 from drone.control import Status, photo_lines
-from drone.fly import PhotoResume
+from drone.session import PhotoResume
 from planner.mavlink import Cmd, MissionItem
 
 

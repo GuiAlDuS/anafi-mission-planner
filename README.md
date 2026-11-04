@@ -173,7 +173,7 @@ uv run anafi-drone --host 192.168.53.1 fly out/<name>/flight_1.mavlink
 `fly` uploads the plan if needed and refuses to start without a GPS fix, a
 home point, enough battery, or if the mission exceeds the drone's limits. Then
 it asks you to type `yes`. While flying: `r` return home, `p` pause/resume,
-`s` stop (hover), `q` leave the view. Photos are triggered by **distance** (GPS
+`s` stop (hover), `l` land, `q` leave the view. Photos are triggered by **distance** (GPS
 lapse) and switched on for each line. After `p` pause and `p` resume, `fly`
 switches them back on for the rest of the paused line, so nothing is missed.
 

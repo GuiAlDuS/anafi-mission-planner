@@ -285,8 +285,9 @@ uv run anafi-drone --host 192.168.53.1 fly out/tiny.mavlink
 landed with a GPS fix, a home point, enough battery (`--min-battery`, default
 30 %) and the mission fits its altitude and distance limits; then it asks you
 to type `yes`. While flying it shows live telemetry and logs it to
-`flight_logs/`: `r` return home, `p` pause/resume, `s` stop (hover), `q`
-leave the view. `anafi-drone rth`, `pause` and `stop` also work on their own.
+`flight_logs/`: `r` return home, `p` pause/resume, `s` stop (hover), `l` land
+where it is, `q` leave the view. A return home ends hovering over home: press
+`l` or land with the Skycontroller. `anafi-drone rth`, `pause` and `stop` also work on their own.
 
 ### Analyze past flights from their photos
 

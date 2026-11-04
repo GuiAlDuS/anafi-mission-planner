@@ -113,7 +113,9 @@ drone/
   iphone.py         FreeFlight 6 plans and logs on a USB-connected iPhone
   control.py        Olympe: drone state, pre-flight checks, start/pause/stop/RTH
   battery.py        pack check: read, judge and log what the battery reports
-  fly.py            interactive mission run with live telemetry
+  session.py        one mission flight for any front end: log, photos after a
+                    resume, return home note, commands (shared by fly and the GUI)
+  fly.py            terminal front end: checks, typed confirmation, live telemetry, keys
 ui/
   server.py         local web app (standard library): API, tile cache, imagery date
   ortho.py          your orthophotos: store, metadata, map tiles (rio-tiler, optional)

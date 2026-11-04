@@ -294,6 +294,15 @@ def stop_plan(dev) -> None:
     dev(Stop()).wait(5)
 
 
+def land(dev) -> None:
+    """Land where the drone is. A playing plan is paused first, or it would fly on."""
+    from olympe.messages.ardrone3.Piloting import Landing
+
+    if read_status(dev).plan_state == "playing":
+        pause_plan(dev)
+    dev(Landing()).wait(5)
+
+
 def return_home(dev) -> None:
     """Pause a running plan (the drone starts RTH only once hovering), then return home."""
     from olympe.messages.ardrone3.Piloting import NavigateHome

@@ -1,18 +1,15 @@
 """Fly a mission from the terminal: check, confirm, start, then watch it live.
 
-Keys while flying: r return home, p pause/resume, s stop (hover), q quit the
-view (the flight plan keeps running on the drone). The Skycontroller stays the
-primary way to take over.
+Keys while flying: r return home, p pause/resume, s stop (hover), l land,
+q quit the view (the flight plan keeps running on the drone). The
+Skycontroller stays the primary way to take over.
 
-A pause switches the drone's photos off and a resume doesn't switch them back
-on, so after a resume inside a photo line `fly` takes over the photos for the
-rest of that line (see PhotoResume).
+What happens during the flight (log, photos after a resume, return home note)
+is in session.FlightSession, shared with the GUI.
 """
 
 from __future__ import annotations
 
-import csv
-import datetime as dt
 import os
 import select
 import sys
@@ -23,11 +20,10 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from . import control
-from .upload import DRONE_HOST, DroneError, FlightPlanClient, NotReachable, append_log, upload_and_verify
+from .session import FlightSession, ensure_uploaded
+from .upload import DRONE_HOST, DroneError, NotReachable
 
-KEYS = "[r] return home  [p] pause/resume  [s] stop (hover)  [q] quit view"
-LOG_FIELDS = ["t_s", "battery_pct", "flying_state", "plan_state", "mission_item", "lat", "lon",
-              "altitude_m", "speed_ms", "home_m", "rth_state", "voltage_mv"]
+KEYS = "[r] return home  [p] pause/resume  [s] stop (hover)  [l] land  [q] quit view"
 
 
 @contextmanager
@@ -48,74 +44,6 @@ def _keys():
         termios.tcsetattr(fd, termios.TCSADRAIN, old)
 
 
-def _ensure_uploaded(mission: control.Mission, path: Path, http_host: str, upload_log: str) -> bool:
-    client = FlightPlanClient(http_host)
-    if any(p.get("uid") == mission.uid for p in client.list()):
-        return True
-    print(f"Plan {mission.uid} isn't on the drone; uploading {path} ...")
-    rec = upload_and_verify(client, path)
-    append_log(rec, upload_log)
-    return rec.uid == mission.uid and rec.readback != "mismatch" and rec.listed
-
-
-class RthWatch:
-    """Notice when a return home ends with the drone hovering over home.
-
-    The Anafi doesn't land after a return home (by default it hovers about 2 m above
-    home), so without a note the live view just keeps waiting for "landed".
-    """
-
-    def __init__(self):
-        self.returning = False
-
-    def update(self, s: control.Status) -> str | None:
-        if s.rth_state in ("inProgress", "pending"):
-            self.returning = True
-            return None
-        if self.returning and s.flying_state == "hovering":
-            self.returning = False
-            dist = s.distance_from_home_m()
-            where = f" ({dist:.0f} m from home)" if dist is not None else ""
-            return (f"Return home finished: the drone is hovering over home{where}. "
-                    "Land it with the Skycontroller.")
-        return None
-
-
-class PhotoResume:
-    """Finish the photos of a line paused halfway (seen in the Sphinx simulator, fw 1.10.4).
-
-    A pause switches the photos off, and a resume doesn't switch them back on: the
-    mission's next photo start (the next line) does. So on a resume inside a photo
-    line we start them ourselves. The drone then skips that line's own photo stop
-    (its flight plan logic thinks they're off), and the next line's start would
-    toggle our photos off and stall 20 s, so we also stop them ourselves: when the
-    plan passes the line's stop item, or stops playing (pause, stop, return home).
-    """
-
-    def __init__(self, items: list):
-        self.lines = control.photo_lines(items)
-        self.stop_at: int | None = None  # our photos are on until this item
-
-    def on_resume(self, item: int | None) -> bool:
-        """After a resume: True if the photos must be started now."""
-        if item is None:
-            return False
-        for start, stop in self.lines:
-            if start <= item < stop:
-                self.stop_at = stop
-                return True
-        return False
-
-    def update(self, s: control.Status) -> bool:
-        """Every status read: True if our photos must be stopped now."""
-        if self.stop_at is None:
-            return False
-        if s.plan_state != "playing" or (s.mission_item is not None and s.mission_item >= self.stop_at):
-            self.stop_at = None
-            return True
-        return False
-
-
 def _confirm(prompt: str) -> bool:
     try:
         return input(prompt).strip().lower() == "yes"
@@ -128,7 +56,7 @@ def fly(host: str, path: str | Path, min_battery_pct: int = 30, http_host: str =
     path = Path(path)
     mission = control.load_mission(path.read_bytes())
     try:
-        on_drone = _ensure_uploaded(mission, path, http_host, upload_log)
+        on_drone = ensure_uploaded(mission, path, http_host, upload_log)
     except NotReachable as e:
         raise DroneError(f"{e}\nCan't check the plan is on the drone. Through the Skycontroller, add:\n"
                          f"  sudo ip route add {DRONE_HOST}/32 via {control.SKYCONTROLLER_HOST}") from e
@@ -147,68 +75,49 @@ def fly(host: str, path: str | Path, min_battery_pct: int = 30, http_host: str =
             print("Not started.")
             return 1
 
-        control.start_plan(dev, mission.uid)
-        return _watch(dev, mission, Path(log_dir))
+        session = FlightSession(dev, mission, log_dir)
+        session.start()
+        try:
+            return _watch(session)
+        finally:
+            shown = len(session.events)  # the live view printed these already
+            session.close()
+            _print_events(session, shown)
 
 
-def _watch(dev, mission: control.Mission, log_dir: Path) -> int:
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / f"{dt.datetime.now():%Y%m%d_%H%M%S}_{mission.uid[:8]}.csv"
-    t0 = time.monotonic()
-    start_battery = None
-    airborne = False
+def _print_events(session: FlightSession, since: int = 0) -> int:
+    for e in session.events[since:]:
+        print("\n" + e.text)
+    return len(session.events)
+
+
+def _watch(session: FlightSession) -> int:
+    shown = _print_events(session)
+    print(KEYS)
     quit_armed_at = 0.0
-    rth = RthWatch()
-    photos = PhotoResume(mission.items)
-    print(f"Started. Logging to {log_path}\n{KEYS}")
-    with open(log_path, "w", newline="") as f, _keys() as read_key:
-        log = csv.writer(f)
-        log.writerow(LOG_FIELDS)
+    with _keys() as read_key:
         while True:
-            s = control.read_status(dev)
-            t = time.monotonic() - t0
-            start_battery = start_battery if start_battery is not None else s.battery_pct
-            airborne = airborne or s.flying_state not in (None, "landed")
-            pos = s.position or (None, None, None)
-            log.writerow([f"{t:.1f}", s.battery_pct, s.flying_state, s.plan_state, s.mission_item, pos[0], pos[1],
-                          s.altitude_m, s.speed_ms, s.distance_from_home_m(), s.rth_state, s.voltage_mv])
-            f.flush()
-            sys.stdout.write("\r\033[K" + control.format_telemetry(s, t, len(mission.items)))
+            s = session.step()
+            sys.stdout.write("\r\033[K" + control.format_telemetry(s, session.elapsed_s, len(session.mission.items)))
             sys.stdout.flush()
-
-            if note := rth.update(s):
-                print("\n" + note)
-            if photos.update(s):
-                control.stop_photos(dev)
-
-            if airborne and s.flying_state == "landed":
-                print(f"\nLanded after {t / 60:.1f} min, battery {start_battery} % -> {s.battery_pct} %.")
+            shown = _print_events(session, shown)
+            if session.finished:
                 return 0
 
             key = read_key(0.5)
             if key == "r":
-                print("\nRETURN HOME")
-                control.return_home(dev)
+                session.return_home()
             elif key == "p":
-                if s.plan_state == "playing":
-                    print("\nPausing (drone hovers). Press p again to resume.")
-                    control.pause_plan(dev)
-                elif s.plan_state == "paused":
-                    print("\nResuming.")
-                    control.start_plan(dev, mission.uid)
-                    if photos.on_resume(s.mission_item):
-                        print("Photos back on for the rest of this line.")
-                        control.start_photos(dev)
+                session.toggle_pause()
             elif key == "s":
-                print("\nStopping the flight plan; the drone hovers. Fly it home with the Skycontroller or press r.")
-                control.stop_plan(dev)
+                session.stop()
+            elif key == "l":
+                session.land()
             elif key == "q":
-                if not airborne or s.flying_state == "landed" or time.monotonic() - quit_armed_at < 3:
+                if not session.airborne or s.flying_state == "landed" or time.monotonic() - quit_armed_at < 3:
                     print("\nLeaving the view." + (" The flight plan continues on the drone; "
-                                                   "use the Skycontroller to take over." if airborne else ""))
-                    if photos.stop_at is not None:  # nobody would stop the photos we started
-                        print("Stopping the photos started after the resume; the next line starts its own.")
-                        control.stop_photos(dev)
+                                                   "use the Skycontroller to take over." if session.airborne else ""))
                     return 0
                 quit_armed_at = time.monotonic()
                 print("\nThe drone is flying. Press q again within 3 s to leave the view anyway.")
+            shown = _print_events(session, shown)

@@ -1,7 +1,7 @@
 """The live view's note when a return home ends hovering (seen in the Sphinx simulator)."""
 
 from drone.control import Status
-from drone.fly import RthWatch
+from drone.session import RthWatch
 
 HOME = (48.879455, 2.370077, 2.0)
 
@@ -16,7 +16,7 @@ def test_note_once_when_return_home_ends_hovering():
            _s("hovering", "available"), _s("hovering", "available")]
     notes = [w.update(s) for s in seq]
     assert notes[:3] == [None, None, None] and notes[4] is None
-    assert "hovering over home (0 m from home)" in notes[3] and "Skycontroller" in notes[3]
+    assert "hovering over home (0 m from home)" in notes[3] and "Land it" in notes[3]
 
 
 def test_no_note_for_a_pause_or_stop_without_return_home():
