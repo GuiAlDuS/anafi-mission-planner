@@ -71,3 +71,41 @@ def test_plan_without_home_is_unchanged():
     pts = [LatLon(9.983, -78.701), LatLon(9.984, -78.701)]
     _, files = plan_files("No home", pts, 60, 8, date_s=1792855328)
     assert len(json.loads(files["savedPlan.json"])["plan"]["wayPoints"]) == 2
+
+
+FF6_PHOTOS = Path(__file__).parent / "data" / "ff6_sim_photos.mavlink"  # FreeFlight re-saved our photo plan
+SIM_HOME = LatLon(48.879455, 2.370077)
+
+
+def _photo_plan():
+    ref = _rows(FF6_PHOTOS.read_text())
+    wps = [LatLon(float(r[8]), float(r[9])) for r in ref if r[3] == "16"]
+    lines = wps[1:-2]  # the route is home, the survey lines, home, home low
+    return ref, plan_files("Photos", lines, 25, 5, date_s=1793802217, home=SIM_HOME, photo_period_s=5.8 / 5)
+
+
+def test_photo_plan_matches_freeflight():
+    ref, (_, files) = _photo_plan()
+    ours = _rows(files["flightPlan.mavlink"].decode())
+    assert [r[3] for r in ours] == [r[3] for r in ref]  # same commands in the same order
+    for a, b in zip(ours, ref):
+        if a[3] in ("2800", "2000", "2001", "50000"):
+            assert a[4:8] == b[4:8], (a, b)
+
+
+def test_photo_plan_tilts_down_at_first_waypoint_not_takeoff():
+    _, (_, files) = _photo_plan()
+    plan = json.loads(files["savedPlan.json"])["plan"]
+    wps = plan["wayPoints"]
+    assert plan["takeoff"] == []  # a tilt at takeoff makes firmware 1.8.x hover instead of flying
+    assert wps[0]["actions"] == [{"type": "Tilt", "angle": -90, "speed": 180}]
+    assert wps[1]["actions"][0]["type"] == "ImageStartCapture" and wps[1]["actions"][0]["period"] == 1.16
+    assert wps[-3]["actions"] == [{"type": "ImageStopCapture"}]  # end of the last line
+    assert all(not w["actions"] for w in wps[2:-3] + wps[-2:])
+    assert not any("Video" in a["type"] for w in wps for a in w["actions"])
+
+
+def test_photo_period_must_be_positive():
+    pts = [LatLon(9.983, -78.701), LatLon(9.984, -78.701)]
+    with pytest.raises(ValueError):
+        plan_files("Bad", pts, 60, 8, photo_period_s=0)

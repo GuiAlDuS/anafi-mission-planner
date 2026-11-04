@@ -1280,8 +1280,8 @@ $("send").addEventListener("click", async () => {
     if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
     const n = body.titles.length;
     saved.textContent = `Sent ${n === 1 ? "plan" : `${n} plans`} to FreeFlight on ${body.phone}: `
-      + `${body.titles.join(", ")}. Close and reopen FreeFlight to see ${n === 1 ? "it" : "them"}, `
-      + `then set the camera to GPS lapse on ${n === 1 ? "the plan" : "each plan"}.`;
+      + `${body.titles.join(", ")}. Close and reopen FreeFlight to see ${n === 1 ? "it" : "them"}. `
+      + `${n === 1 ? "It points the camera down and takes photos" : "They point the camera down and take photos"} by itself.`;
     loadMissionList();
   } catch (err) {
     saved.textContent = `Not sent: ${err.message}`;

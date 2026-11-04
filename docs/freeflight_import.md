@@ -45,10 +45,38 @@ In `anafi-gui`: name the mission and press **Send to FreeFlight** (enabled
 while an iPhone is connected). Then on the phone:
 
 1. Close FreeFlight 6 (swipe it away) and reopen it; it reads new plans on start.
-2. Flight Plan mode: the plans are listed under the mission name ("name 1",
-   "name 2" for multi-battery missions).
-3. Open each plan and **set the camera to GPS lapse**: the camera mode isn't
-   stored in the plan files (FreeFlight always writes video start/stop there).
+2. Flight Plan mode: open the plan. Plans are listed under the mission name
+   ("name 1", "name 2" for multi-battery missions). No camera setting is
+   needed: the plan sets it.
+3. Start the plan. It climbs straight up over the takeoff point, tilts the
+   camera straight down, takes photos from the start of the first line to the
+   end of the last one, comes back over home and descends to 5 m: land with
+   the controller.
+
+### Camera: set by the plan
+
+The plan's own actions set the camera, and they override FreeFlight's camera
+control (photo/video icon, GPS lapse, Single...) as soon as the plan starts.
+Found in the simulator (2026-11-04): a plan with video actions filmed video
+whatever the camera control said. Our plans carry:
+
+| Where | Action in `savedPlan.json` | FreeFlight sends |
+|---|---|---|
+| First waypoint (over home, survey altitude) | `Tilt`, angle −90, speed 180 | `2800` (panorama), vertical angle −90 at 180°/s |
+| Start of line 1 | `ImageStartCapture`, period = photo spacing ÷ speed, rectilinear JPEG (`resolution` 12.58) | `2000`, interval in s |
+| End of the last line | `ImageStopCapture` | `2001` |
+
+- **Time lapse, not GPS lapse.** The only photo action seen in plan files
+  takes a time interval, so the spacing is speed × period: in the simulator
+  the drone flew 4.7 m/s instead of 5 and spaced photos 5.5 m instead of 5.8
+  (front overlap 81 % instead of 80 %). Photos are also taken on the short
+  hops between lines.
+- **The tilt is relative** to the current tilt (−90 from level = straight
+  down), and it goes on the first waypoint: users report that a tilt in the
+  takeoff actions makes firmware 1.8.x hover instead of flying the plan.
+- In the app, these actions are in the plan's action menu: the button beside
+  the plan list whose icon is a page with a "+".
+- Reference: `tests/data/ff6_sim_photos.mavlink`, our plan as FreeFlight re-saved it.
 
 From the command line:
 

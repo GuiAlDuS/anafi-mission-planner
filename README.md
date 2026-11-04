@@ -117,9 +117,9 @@ uv run anafi-gui
    reopened and edited.
 3. **Send:** plug in the iPhone (unlock it, tap "Trust" the first time) and
    press **Send to FreeFlight**.
-4. **On the phone:** restart FreeFlight 6, open each plan in Flight Plan mode
-   and **set the camera to GPS lapse** (plan files can't store it). Fly as
-   usual.
+4. **On the phone:** restart FreeFlight 6, open the plan in Flight Plan mode
+   and start it. The plan points the camera down and takes the photos by
+   itself.
 5. **After flying:** in the **Batteries** tab, press "Copy new logs from
    iPhone" and pick the battery that flew each flight.
 

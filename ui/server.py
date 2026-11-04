@@ -232,6 +232,8 @@ def _save(req: dict, out_root: Path) -> tuple[dict, list[tuple[str, str, dict[st
     (out / "freeflight").mkdir(parents=True, exist_ok=True)
     files, zips, plans = [], [], []
     altitude, speed = float(req.get("altitude", 120)), float(req.get("speed", 10))
+    # FreeFlight plans take time-lapse photos: the interval that gives the planned spacing at survey speed.
+    photo_period = resp["photo_spacing_m"] / speed
     for n, (text, points) in enumerate(zip(missions, waypoints), 1):
         p = out / f"flight_{n}.mavlink"
         p.write_text(text)
@@ -240,7 +242,8 @@ def _save(req: dict, out_root: Path) -> tuple[dict, list[tuple[str, str, dict[st
         # mission name and flight so that sending again replaces the plan.
         title = name if len(missions) == 1 else f"{name} {n}"
         folder, ff6_files = plan_files(title, points, altitude, speed,
-                                       plan_uuid=iphone.plan_uuid(name, n), home=home)
+                                       plan_uuid=iphone.plan_uuid(name, n), home=home,
+                                       photo_period_s=photo_period)
         z = out / "freeflight" / f"{folder}.zip"
         z.write_bytes(plan_zip(ff6_files))
         zips.append(str(z))

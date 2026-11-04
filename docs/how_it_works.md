@@ -19,8 +19,8 @@ Found while building this, on an Anafi 4K (fw 1.8.2), Skycontroller 3 (fw
   `/Documents/.Contents/FlightPlan/<UUID>/` (`savedPlan.json`,
   `flightPlan.mavlink`, `screenshot.png`) and flight logs in
   `/Documents/.Contents/runs/`, both reachable over USB. It lists plan folders
-  it didn't create after a restart. It doesn't write the camera mode (GPS
-  lapse) into plan files.
+  it didn't create after a restart. The plan's actions set the camera (tilt,
+  time-lapse photos) and override the app's camera control.
 - **Flight logs** of past surveys: vertical climb over home at 2.5 m/s; flight
   time model within 2 %; battery endurance fell from ~24 min (2021) to ~15 min
   (2023-25), most likely because of one worn pack (55 % health in the pack

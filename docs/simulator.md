@@ -19,6 +19,8 @@ releases Parrot supports.
 |---|---|
 | Tiny mission: takeoff (`22`), waypoint (`16`), land (`21`) | ✅ flown end to end in 25 s, started by UID with Olympe |
 | Pause, resume, stop, return home (`fly`'s `p`, `s`, `r` keys) | ✅ pause and stop hover within 1 s; resume continues the line; return home flies back and hovers 2 m above home |
+| FreeFlight 6 plan from our planner (Send to FreeFlight, flown from the phone), 8 lines at 25 m, 5 m/s (2026-11-04) | ✅ vertical climb over home (0.1 m drift), lines at 25.0 m, back over home, vertical descent to 5 m (within 1.1 m of home) and hover; about 2:30 from takeoff to hover (3:31 estimated with landing). The plan's video actions overrode the app's camera control: one 2.5 min video |
+| Same plan with photo actions: tilt −90° at the first waypoint, time lapse every 1.16 s (5.8 m at 5 m/s) (2026-11-04) | ✅ 104 photos, all at −90°, spacing 5.5 m (drone flew 4.7 m/s), front/side overlap 81/82 %. Now the default for Send to FreeFlight |
 | 7-line survey at 25 m, 5 m/s, distance-triggered photos (`50001`, `2000`/`2001`) | ✅ 63 photos in GPS-lapse mode, spacing 5.9 m (5.8 m planned), front/side overlap 80/83 % as planned, camera at −90°, 3:00 flown vs 3:20 estimated |
 
 What the simulator taught us:

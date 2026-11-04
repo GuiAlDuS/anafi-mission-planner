@@ -9,7 +9,8 @@ publish before section 1 is done.
 
 - [ ] Fly the tiny mission (`anafi-drone fly`): takeoff, waypoint, land work.
 - [ ] Fly a small survey sent with **Send to FreeFlight** and flown from
-      FreeFlight 6 with GPS lapse: photos every N metres, camera pointing down.
+      FreeFlight 6: time-lapse photos set by the plan, camera pointing down
+      (works in the simulator, 2026-11-04).
 - [ ] Check the photos: count, spacing and overlap (`anafi-plan analyze`),
       and process them in photogrammetry software.
 - [ ] A multi-battery mission: flight 2 resumes at the right line.

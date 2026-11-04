@@ -61,9 +61,10 @@ The Skycontroller stays the primary way to take over. Without the live view:
 4. **Tiny survey with photos:** a small area at 30-40 m. Are photos taken every
    N meters with the camera pointing down? Check the photo count and EXIF
    afterwards (`anafi-plan analyze`).
-5. **FreeFlight 6 photo plan:** fly a short FreeFlight plan set to GPS lapse,
-   then `uv run anafi-drone pull-all -o drone_plans/` to see what FreeFlight
-   sends for photos.
+5. **FreeFlight 6 photo plan:** fly a short plan sent with Send to FreeFlight
+   (it sets the camera itself). Check that the camera tilts down after the
+   climb and that photos come every few metres (`anafi-plan analyze`). This is
+   the real-drone check of the tilt on firmware 1.8.2.
 6. Keep the `flight_logs/` CSVs, and after the session copy FreeFlight's logs
    (`anafi-drone freeflight pull-runs`), label each flight with the battery
    that flew it (`anafi-plan runs --label 0042=B`) and check each battery's
