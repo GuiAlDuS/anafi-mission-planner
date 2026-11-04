@@ -115,10 +115,13 @@ one) and has no password.
    (`Anafi_PC_…`) in the iPhone's Wi-Fi settings and open FreeFlight 6. It
    finds the drone and shows its camera; you can already fly from the phone.
 2. **Then the Skycontroller.** Switch it on and plug it into the phone.
-   FreeFlight switches to the controller and loses the drone for a while: the
-   controller is looking for the drone it was paired with. **Wait.** About 6
-   minutes later the controller joined the simulated drone's network by itself
-   (FreeFlight hands it over), and the sticks, buttons and camera view work.
+   FreeFlight now talks through the controller, which is still searching for
+   the real drone it was paired with, so the drone disappears from the app.
+   Tell the controller which network to join: tap the **controller box** on
+   FreeFlight's homepage, then **Connect**. FreeFlight shows the Wi-Fi
+   networks the controller can see. Choose the PC's `Anafi_PC_…` network.
+   Once the controller joins it, the sticks, buttons and camera view all work
+   with the simulated drone.
 
 Afterwards the controller is paired with the simulated drone. Pair it with a
 real Anafi again with the USB cable (controller USB-A to drone USB-C).
