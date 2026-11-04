@@ -24,6 +24,7 @@ releases Parrot supports.
 | Stick push during a FreeFlight plan: right stick sideways ~2 s on line 2 (2026-11-04) | ✅ the drone **pauses** the plan at once (`PCMD_THRESHOLD_REACHED`, flight plan `pause`), hovers and gives you control; return home from the pause worked |
 | Resume after the stick pause (play button) | ✅ the route continues to the waypoint it was heading for, and the camera tilts back down at the next line start. ❌ photos stay off: the drone stops photo capture when it pauses and doesn't restart it |
 | Repeating the photo start at every waypoint, or at every line start, to restart photos after a resume | ❌ a start while photos run stops them; stop/start pairs fell into a cycle of skipped starts and 20 s stop timeouts (whole lines without photos), and the final stop was skipped (camera still shooting after landing). Photos are started once |
+| Finish a survey from line 4 (GUI "Start at line", Send to FreeFlight), 40 m (2026-11-04) | ✅ saved as `sim_ff6_survey_from_line_4`; flew only lines 4–6, 26 photos at −90°, front/side overlap 80/84 %, clean stop at the last line |
 | Final FreeFlight layout: tilt at every line start, photos started once at line 1, stopped at the last line end | ✅ 114 photos, all at −90°, along all 8 lines, spacing 5.6 m (front 81 %), ~1 s hovers, no errors; about 3 min airborne |
 | 7-line survey at 25 m, 5 m/s, distance-triggered photos (`50001`, `2000`/`2001`) | ✅ 63 photos in GPS-lapse mode, spacing 5.9 m (5.8 m planned), front/side overlap 80/83 % as planned, camera at −90°, 3:00 flown vs 3:20 estimated |
 

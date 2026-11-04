@@ -32,6 +32,10 @@ function buildChips(id, values, label) {
   setParam(id, box.dataset.default);
 }
 
+// "Start at line" belongs to one survey: never remembered, back to 1 for any other area.
+function fromLine() { return Math.max(1, Math.round(Number($("from_line").value)) || 1); }
+function resetFromLine(n = 1) { $("from_line").value = n; $("resume-box").open = n > 1; }
+
 function syncAngleMode() {
   const set = getParam("angle-mode") === "set";
   $("angle").disabled = !set;
@@ -706,8 +710,8 @@ let flightGroups = {}; // flight number -> layer group, for highlighting from th
 function flightLegs(plan) {
   // plan.geojson flight paths are home, s1, e1, s2, e2, ..., home
   const legs = [];
-  let lineNo = 0;
-  const totalLines = plan.lines;
+  let lineNo = (plan.from_line || 1) - 1;
+  const totalLines = plan.total_lines || plan.lines;
   const land = getParam("end") === "land";
   for (const f of plan.geojson.features) {
     if (f.properties.kind !== "flight") continue;
@@ -751,7 +755,7 @@ function lineBadge(leg, group) {
   const len = Math.hypot(q.x - p.x, q.y - p.y) || 1;
   const at = map.layerPointToLatLng(L.point(p.x - (q.x - p.x) / len * 16, p.y - (q.y - p.y) / len * 16));
   L.marker(at, {
-    icon: L.divIcon({ className: "", html: `<div class="line-badge">${leg.line}</div>`, iconSize: [22, 22] }),
+    icon: L.divIcon({ className: "", html: `<div class="line-badge${leg.done ? " is-done" : ""}">${leg.line}</div>`, iconSize: [22, 22] }),
     interactive: false, keyboard: false, zIndexOffset: 500,
   }).addTo(group);
 }
@@ -772,6 +776,7 @@ function drawRoute(plan) {
   drawPhotos(plan);
   if (!plan) return;
   const legs = flightLegs(plan);
+  drawDoneLines(plan);
   // Number every line (and give each an arrow) only when they're far enough apart on screen;
   // otherwise just each flight's first line.
   const spacingPx = plan.line_spacing_m / metresPerPixel();
@@ -802,6 +807,24 @@ function drawRoute(plan) {
     if ((leg.photo && (numberAll || leg.first)) || leg.kind === "out" || leg.kind === "back") {
       chevron(leg.from, leg.to, group, leg.photo ? plan.photo_spacing_m : null);
     }
+  }
+}
+
+function drawDoneLines(plan) {
+  // Lines left out with "Start at line": grey, numbered, not part of any flight.
+  const done = plan.geojson.features.filter((f) => f.properties.kind === "done_line");
+  if (!done.length) return;
+  const group = L.layerGroup().addTo(routeLayer);
+  const numberAll = plan.line_spacing_m / metresPerPixel() >= 24; // as for the route: only when legible
+  for (const f of done) {
+    const [a, b] = f.geometry.coordinates.map(([lon, lat]) => L.latLng(lat, lon));
+    L.polyline([a, b], { color: "#FFFFFF", weight: 4, opacity: 0.5, interactive: false }).addTo(group);
+    L.polyline([a, b], { color: "#6B7570", weight: 2, opacity: 0.9, dashArray: "2 5", interactive: false })
+      .addTo(group);
+    L.polyline([a, b], { color: "#000", weight: 16, opacity: 0 })
+      .bindTooltip(`Line ${f.properties.line}: left out (start at line ${plan.from_line})`,
+        { sticky: true, className: "route-tip" }).addTo(group);
+    if (numberAll || f.properties.line === 1) lineBadge({ from: a, to: b, line: f.properties.line, done: true }, group);
   }
 }
 
@@ -967,6 +990,7 @@ $("draw").addEventListener("click", () => {
   if (state.area.length) rememberArea();
   state.area = [];
   state.plan = null;
+  resetFromLine();
   drawRoute(null);
   renderPlan(null);
   setMode("drawing");
@@ -975,6 +999,7 @@ $("set-home").addEventListener("click", () => setMode(state.mode === "home" ? "i
 $("clear").addEventListener("click", () => {
   if (state.area.length) rememberArea();
   state.area = []; state.home = null; state.plan = null;
+  resetFromLine();
   drawHome(); drawRoute(null); renderPlan(null); setMode("idle"); saveState();
 });
 
@@ -1008,6 +1033,7 @@ $("load").addEventListener("change", async (e) => {
     const ring = firstRing(JSON.parse(await file.text()));
     state.area = ring;
     state.plan = null;
+    resetFromLine();
     setMode(state.home ? "idle" : "home");
     if (state.mode === "home") $("hint").textContent = `Loaded ${file.name}. Now click where the drone will take off.`;
     map.fitBounds(L.latLngBounds(ring), { padding: [40, 40] });
@@ -1038,7 +1064,7 @@ function firstRing(obj) {
 document.querySelector(".panel").addEventListener("input", (e) => {
   const k = e.target.name || e.target.id;
   if (k === "angle-mode") syncAngleMode();
-  if (PARAMS.includes(k)) replanSoon();
+  if (PARAMS.includes(k) || k === "from_line") replanSoon();
 });
 
 // ---------- planning ----------
@@ -1049,7 +1075,7 @@ function request() {
   const params = Object.fromEntries(PARAMS.map((k) => [k, getParam(k)]));
   if (params["angle-mode"] !== "set" || params.angle === "") params.angle = null;
   delete params["angle-mode"];
-  return { area: state.area, home: state.home, ...params };
+  return { area: state.area, home: state.home, ...params, from_line: fromLine() };
 }
 
 function replanSoon() {
@@ -1107,9 +1133,11 @@ function renderPlan(p, error) {
     <div class="stat"><b>${mmss(p.total_s)}</b><small>flight time</small></div>
     <div class="stat"><b>${p.photos}</b><small>photos</small></div>
     <div class="stat"><b>${p.flights.length}</b><small>${p.flights.length === 1 ? "battery" : "batteries"}</small></div>`;
+  $("from_line").max = p.total_lines;
+  const from = p.from_line > 1 ? ` Starting at line ${p.from_line} of ${p.total_lines}: lines 1–${p.from_line - 1} left out.` : "";
   $("summary").textContent = `${fmt(p.gsd_cm, 1)} cm per pixel. ${p.lines} lines, ${fmt(p.line_spacing_m, 1)} m apart `
     + `(side overlap ${fmt(p.side_overlap * 100)}%). A photo every ${fmt(p.photo_spacing_m, 1)} m; `
-    + `each covers ${fmt(p.footprint_m[0])} × ${fmt(p.footprint_m[1])} m.`;
+    + `each covers ${fmt(p.footprint_m[0])} × ${fmt(p.footprint_m[1])} m.${from}`;
   if (getParam("angle-mode") === "auto") {
     $("angle").placeholder = fmt(p.angle_deg % 180);
     $("angle-note").textContent = `Auto picked ${fmt(p.angle_deg % 180)}° from north, the quickest direction for this area.`;
@@ -1141,9 +1169,15 @@ function escapeHtml(s) {
 }
 
 // ---------- save ----------
+function showStatus(kind, text) {
+  // kind: "ok" (green, with a check), "error" (red), "busy" or "" (plain hint)
+  const el = $("saved");
+  el.className = kind ? `status is-${kind}` : "hint";
+  el.textContent = text;
+}
+
 $("save-form").addEventListener("submit", async (e) => {
   e.preventDefault();
-  const saved = $("saved");
   try {
     const res = await fetch("/api/save", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -1152,11 +1186,11 @@ $("save-form").addEventListener("submit", async (e) => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
     const n = body.files.length;
-    saved.textContent = `Saved ${n} mission file${n === 1 ? "" : "s"} in ${body.folder}/, `
-      + `plus ${n === 1 ? "a FreeFlight 6 copy" : "FreeFlight 6 copies"} in ${body.folder}/freeflight/.`;
+    showStatus("ok", `Saved ${n} mission file${n === 1 ? "" : "s"} in ${body.folder}/, `
+      + `plus ${n === 1 ? "a FreeFlight 6 copy" : "FreeFlight 6 copies"} in ${body.folder}/freeflight/.`);
     loadMissionList();
   } catch (err) {
-    saved.textContent = `Not saved: ${err.message}`;
+    showStatus("error", `Not saved: ${err.message}`);
   }
 });
 
@@ -1218,16 +1252,17 @@ async function openMission(name) {
     setParam("angle-mode", m.angle === null || m.angle === undefined || m.angle === "" ? "auto" : "set");
     if (m.angle !== null && m.angle !== undefined) setParam("angle", m.angle);
     syncAngleMode();
+    resetFromLine(Number(m.from_line) || 1);
     $("name").value = m.name;
     state.plan = null;
     drawHome();
     setMode("idle");
     map.fitBounds(L.latLngBounds(state.area.concat(state.home ? [state.home] : [])), { padding: [40, 40] });
     replanSoon();
-    $("saved").textContent = `Opened ${m.name}. Saving again under the same name replaces it.`;
+    showStatus("", `Opened ${m.name}. Saving again under the same name replaces it.`);
     loadMissionList();
   } catch (err) {
-    $("saved").textContent = `Couldn't open ${name}: ${err.message}`;
+    showStatus("error", `Couldn't open ${name}: ${err.message}`);
   }
 }
 
@@ -1239,11 +1274,11 @@ async function deleteMission(name) {
       body: JSON.stringify({ name }) });
     const out = await res.json();
     if (!res.ok) throw new Error(out.error || `HTTP ${res.status}`);
-    $("saved").textContent = `Moved ${name} to the trash.`
-      + (missionName($("name").value) === name ? " It's still on the map: Save mission keeps it again." : "");
+    showStatus("ok", `Moved ${name} to the trash.`
+      + (missionName($("name").value) === name ? " It's still on the map: Save mission keeps it again." : ""));
     loadMissionList(out.missions);
   } catch (err) {
-    $("saved").textContent = `Not deleted: ${err.message}`;
+    showStatus("error", `Not deleted: ${err.message}`);
   }
 }
 
@@ -1268,9 +1303,8 @@ async function checkPhone() {
 }
 
 $("send").addEventListener("click", async () => {
-  const saved = $("saved");
   $("send").disabled = true;
-  saved.textContent = "Sending to FreeFlight…";
+  showStatus("busy", "Sending to FreeFlight…");
   try {
     const res = await fetch("/api/iphone/send", {
       method: "POST", headers: { "Content-Type": "application/json" },
@@ -1279,12 +1313,12 @@ $("send").addEventListener("click", async () => {
     const body = await res.json();
     if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
     const n = body.titles.length;
-    saved.textContent = `Sent ${n === 1 ? "plan" : `${n} plans`} to FreeFlight on ${body.phone}: `
-      + `${body.titles.join(", ")}. Close and reopen FreeFlight to see ${n === 1 ? "it" : "them"}. `
-      + `${n === 1 ? "It points the camera down and takes photos" : "They point the camera down and take photos"} by itself.`;
+    showStatus("ok", `On ${body.phone}: ${body.titles.join(", ")}. Close and reopen FreeFlight to see `
+      + `${n === 1 ? "it" : "them"}; ${n === 1 ? "it points the camera down and takes photos" : "they point the camera down and take photos"} by itself.`);
+    $("saved").insertAdjacentHTML("afterbegin", `<strong>Sent to FreeFlight.</strong> `);
     loadMissionList();
   } catch (err) {
-    saved.textContent = `Not sent: ${err.message}`;
+    showStatus("error", `Not sent: ${err.message}`);
   } finally {
     updateSend();
   }

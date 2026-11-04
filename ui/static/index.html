@@ -75,6 +75,15 @@
         <label class="field"><span>Keep in reserve</span><input id="reserve" type="number" min="0" max="60" step="5" value="25"><em>%</em></label>
       </div>
     </details>
+    <details class="more" id="resume-box">
+      <summary>Finish an interrupted survey</summary>
+      <div class="fields">
+        <label class="field"><span>Start at line</span><input id="from_line" type="number" min="1" step="1" value="1"></label>
+      </div>
+      <p class="hint">After taking over a flight, fly the rest of the survey. The grid stays the same;
+        lines before this one are left out and shown grey on the map. It's saved as a new mission
+        (name_from_line_N), so the whole survey stays on the phone too.</p>
+    </details>
   </section>
 
   <section class="block results" aria-labelledby="result-h" aria-live="polite">

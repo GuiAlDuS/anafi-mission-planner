@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Sequence
 
 from .estimate import BatteryStatus, FlightEstimate, FlightModel, estimate_flight
@@ -23,6 +23,12 @@ class SurveyPlan:
     home: LatLon
     model: FlightModel
     flights: list[Flight] = field(default_factory=list)
+    start_line: int = 1  # 1-based: lines before it were already flown and are left out
+    all_lines: list[SurveyLine] = field(default_factory=list)  # the whole grid, for numbering
+
+    @property
+    def total_lines(self) -> int:
+        return len(self.all_lines) or len(self.grid.lines)
 
     @property
     def total_s(self) -> float:
@@ -34,8 +40,14 @@ def plan_survey(
     home: LatLon,
     settings: SurveySettings = SurveySettings(),
     model: FlightModel = FlightModel(),
+    start_line: int = 1,
 ) -> SurveyPlan:
-    """Build the grid (trying candidate angles unless one is fixed) and split it into flights."""
+    """Build the grid (trying candidate angles unless one is fixed) and split it into flights.
+
+    With `start_line` > 1 (to finish a survey after a takeover), the grid is chosen
+    as for the whole survey, so the lines and their numbers stay the same, and only
+    lines from `start_line` on are split into flights.
+    """
     if settings.angle_deg is not None:
         angles = [settings.angle_deg]
     else:
@@ -47,10 +59,17 @@ def plan_survey(
         if best is None or (len(plan.flights), plan.total_s) < (len(best.flights), best.total_s):
             best = plan
     assert best is not None
+    best.all_lines = list(best.grid.lines)
+    if start_line != 1:
+        if not 1 <= start_line <= len(best.all_lines):
+            raise ValueError(f"start line must be 1-{len(best.all_lines)}")
+        best.grid = replace(best.grid, lines=best.all_lines[start_line - 1:])
+        best.flights = split_flights(best.grid, home, model, first_index=start_line - 1)
+        best.start_line = start_line
     return best
 
 
-def split_flights(grid: SurveyGrid, home: LatLon, model: FlightModel) -> list[Flight]:
+def split_flights(grid: SurveyGrid, home: LatLon, model: FlightModel, first_index: int = 0) -> list[Flight]:
     """Greedily pack consecutive lines into flights whose estimate stays OK.
 
     Each later flight resumes at the next line, with its own transit from and
@@ -69,7 +88,7 @@ def split_flights(grid: SurveyGrid, home: LatLon, model: FlightModel) -> list[Fl
             if e_next.status is not BatteryStatus.OK:
                 break
             j, e = j + 1, e_next
-        flights.append(Flight(lines=grid.lines[i:j], first_line_index=i, estimate=e))
+        flights.append(Flight(lines=grid.lines[i:j], first_line_index=first_index + i, estimate=e))
         i = j
     return flights
 
@@ -81,6 +100,10 @@ def plan_geojson(plan: SurveyPlan) -> dict:
         {"type": "Feature", "properties": {"kind": "home"},
          "geometry": {"type": "Point", "coordinates": [plan.home.lon, plan.home.lat]}},
     ]
+    for k, ln in enumerate(plan.all_lines[:plan.start_line - 1], 1):  # already flown
+        feats.append({"type": "Feature", "properties": {"kind": "done_line", "line": k},
+                      "geometry": {"type": "LineString",
+                                   "coordinates": [[ln.start.lon, ln.start.lat], [ln.end.lon, ln.end.lat]]}})
     for n, f in enumerate(plan.flights, 1):
         pts = [plan.home] + [p for ln in f.lines for p in (ln.start, ln.end)] + [plan.home]
         feats.append({"type": "Feature", "properties": {"kind": "flight", "flight": n},

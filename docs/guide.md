@@ -139,6 +139,14 @@ per battery and a `plan.geojson` preview. `anafi-plan
 plan -h` lists all options: line heading, overshoot, end action (`rth` or
 `land`), battery endurance and reserve.
 
+`--from-line N` flies only lines N to the end, to finish a survey after a
+takeover: the grid, its direction and the line numbers are the ones of the
+whole survey, and the remaining lines are split into batteries again. In
+`anafi-gui` it's **Finish an interrupted survey → Start at line**: the lines
+left out turn grey on the map, and the mission is saved as
+`name_from_line_N`. It goes back to 1 whenever you draw, load or clear an
+area, so a new survey never skips lines.
+
 A tiny test mission (takeoff, vertical climb over home, one waypoint, land) for first flights:
 
 ```bash

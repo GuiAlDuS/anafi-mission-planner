@@ -55,12 +55,19 @@ def cmd_plan(args) -> int:
     settings = SurveySettings(altitude_m=args.alt, front_overlap=args.front / 100, side_overlap=args.side / 100,
                               speed_ms=args.speed, angle_deg=args.angle, overshoot_m=args.overshoot)
     model = replace(FlightModel(), endurance_min=args.endurance, reserve_frac=args.reserve / 100)
-    plan = plan_survey(read_polygon(args.area), parse_latlon(args.home), settings, model)
+    try:
+        plan = plan_survey(read_polygon(args.area), parse_latlon(args.home), settings, model,
+                           start_line=args.from_line)
+    except ValueError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 2
     g = plan.grid
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
     print(f"GSD {g.gsd_m * 100:.2f} cm/px | footprint {settings.footprint_across_m:.0f} x {settings.footprint_along_m:.0f} m")
+    if plan.start_line > 1:
+        print(f"Starting at line {plan.start_line} of {plan.total_lines}: lines 1-{plan.start_line - 1} left out")
     print(f"Lines: {len(g.lines)} at {g.angle_deg:.1f} deg, spacing {g.line_spacing_m:.1f} m "
           f"(side overlap {g.side_overlap_actual:.0%}), photo every {g.photo_spacing_m:.1f} m, ~{g.photo_count} photos")
     print(f"Flights: {len(plan.flights)}, total {_mmss(plan.total_s)}")
@@ -171,6 +178,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--end", choices=["rth", "land"], default="rth", help="end of mission action")
     p.add_argument("--endurance", type=float, default=FlightModel.endurance_min, help="usable battery minutes")
     p.add_argument("--reserve", type=float, default=FlightModel.reserve_frac * 100, help="battery reserve (%%)")
+    p.add_argument("--from-line", type=int, default=1,
+                   help="fly only lines from this one on (same grid and numbers), to finish a survey")
     p.add_argument("-o", "--out", default="out", help="output directory")
     p.set_defaults(func=cmd_plan)
 

@@ -62,7 +62,11 @@ button to resume; return home also works.
 - **Photos stay off after a resume.** The drone switches the photo capture off
   when it pauses and doesn't switch it back on. The rest of the plan is flown
   without photos. After a takeover, return home and fly the remaining lines
-  as a new plan, or fly with `anafi-drone fly` from a laptop instead.
+  as a new plan: in `anafi-gui`, open the mission, set **Finish an
+  interrupted survey → Start at line** and press Send to FreeFlight (or
+  `anafi-plan plan ... --from-line N`). The grid and line numbers stay the
+  same; it's saved as `name_from_line_N`, so it doesn't replace the whole
+  survey on the phone. Or fly with `anafi-drone fly` from a laptop instead.
 - Repeating the photo start in the plan doesn't work around it: a photo start
   while photos are running stops them, and repeated stop/start pairs jammed the
   camera (skipped starts, 20 s stop timeouts, whole lines without photos, and

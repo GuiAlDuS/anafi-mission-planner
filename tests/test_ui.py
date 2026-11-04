@@ -47,6 +47,38 @@ def test_save_plan(tmp_path):
         save_plan({"area": AREA, "name": "  "}, tmp_path)
 
 
+def test_plan_from_line_keeps_grid_and_numbers():
+    base = {"area": AREA, "home": HOME, "altitude": "40"}
+    full, _, full_wps = build_plan(base)
+    assert full["lines"] >= 4 and full["from_line"] == 1 and full["total_lines"] == full["lines"]
+    part, _, part_wps = build_plan({**base, "from_line": 3})
+    assert part["from_line"] == 3 and part["total_lines"] == full["lines"]
+    assert part["lines"] == full["lines"] - 2
+    assert part["flights"][0]["first_line"] == 3 and part["flights"][-1]["last_line"] == full["lines"]
+    # Same grid: the remaining waypoints are the full plan's from line 3 on (2 per line).
+    flat = lambda wps: [p for w in wps for p in w]  # noqa: E731
+    assert flat(part_wps) == flat(full_wps)[4:]
+    done = [f["properties"]["line"] for f in part["geojson"]["features"] if f["properties"]["kind"] == "done_line"]
+    assert done == [1, 2]
+
+
+def test_plan_from_line_out_of_range():
+    with pytest.raises(BadRequest, match="start line must be"):
+        build_plan({"area": AREA, "home": HOME, "altitude": "40", "from_line": 99})
+
+
+def test_save_from_line_gets_its_own_name(tmp_path):
+    base = {"area": AREA, "home": HOME, "altitude": "40", "name": "north"}
+    full = save_plan(base, tmp_path)
+    part = save_plan({**base, "from_line": 3}, tmp_path)
+    assert part["folder"] == str(tmp_path / "north_from_line_3")
+    assert Path(part["freeflight"][0]).name != Path(full["freeflight"][0]).name  # other plan on the phone
+    req = json.loads((tmp_path / "north_from_line_3" / "request.json").read_text())
+    assert req["name"] == "north_from_line_3" and req["from_line"] == 3
+    again = save_plan(req, tmp_path)  # reopening and saving keeps one suffix
+    assert again["folder"] == part["folder"]
+
+
 def test_run_cache_and_labels(tmp_path):
     from tests.test_runs import write_log
     from ui.server import RunCache

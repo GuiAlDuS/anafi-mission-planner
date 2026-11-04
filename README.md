@@ -126,6 +126,12 @@ uv run anafi-gui
 FreeFlight plans end hovering 5 m above the takeoff point: land with the
 controller.
 
+**If you take over:** pushing a stick pauses the plan and gives you control.
+Play resumes the route, but the drone doesn't restart the photos. Return home
+instead, then open the mission, set **Finish an interrupted survey → Start at
+line** to the line you were on and send it again: it flies the same grid from
+that line on, saved as `name_from_line_N` next to the whole survey.
+
 ![Saved missions and Send to FreeFlight](docs/images/missions.jpg)
 
 More: [map, drawing and editing](docs/guide.md#the-map) ·

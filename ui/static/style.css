@@ -153,6 +153,12 @@ button, .tool, input, select { font: inherit; color: inherit; }
 .flight .meta { color: var(--muted); font-size: 14px; }
 .flight .time { font: 700 20px/1 var(--cond); font-variant-numeric: tabular-nums; }
 .flight .battery { grid-column: 1 / -1; font-size: 14px; }
+.status { margin: 10px 0 0; padding: 8px 10px; border-radius: 6px; font-size: 14px; line-height: 1.4;
+  border-left: 4px solid var(--rule); background: var(--surface); }
+.status.is-ok { border-left-color: var(--ok); background: #E7F3EC; color: var(--ink); }
+.status.is-ok::before { content: "✓ "; color: var(--ok); font-weight: 700; }
+.status.is-error { border-left-color: var(--danger); background: #FBE9EC; color: var(--ink); }
+.status.is-busy { color: var(--muted); }
 .badge { font-weight: 600; }
 .badge.ok { color: var(--ok); }
 .badge.tight { color: var(--tight); }
@@ -343,6 +349,7 @@ body.basemap-open .imagery-info { visibility: hidden; }
   background: var(--ink); color: #fff; box-shadow: 0 0 0 2px #fff;
   font: 700 13px/1 var(--cond); font-variant-numeric: tabular-nums;
 }
+.line-badge.is-done { background: #fff; color: #6B7570; box-shadow: 0 0 0 2px #6B7570; }
 .line-badge.small { display: inline-grid; width: 18px; height: 18px; font-size: 11px; margin: 0 5px 0 5px; }
 .land-mark {
   width: 24px; height: 24px; border-radius: 4px; display: grid; place-items: center;

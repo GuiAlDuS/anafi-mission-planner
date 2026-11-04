@@ -197,7 +197,11 @@ def build_plan(req: dict) -> tuple[dict, list[str], list[list[LatLon]]]:
     if end not in ("rth", "land"):
         raise BadRequest("end must be 'rth' or 'land'")
 
-    plan = plan_survey(area, home, settings, model)
+    try:
+        start_line = int(req.get("from_line") or 1)
+        plan = plan_survey(area, home, settings, model, start_line=start_line)
+    except ValueError as e:
+        raise BadRequest(str(e)) from e
     g = plan.grid
     missions, waypoints, flights = [], [], []
     for n, f in enumerate(plan.flights, 1):
@@ -215,7 +219,8 @@ def build_plan(req: dict) -> tuple[dict, list[str], list[list[LatLon]]]:
         "home": [home.lat, home.lon],
         "gsd_cm": g.gsd_m * 100,
         "footprint_m": [settings.footprint_across_m, settings.footprint_along_m],
-        "lines": len(g.lines), "angle_deg": g.angle_deg, "line_spacing_m": g.line_spacing_m,
+        "lines": len(g.lines), "total_lines": plan.total_lines, "from_line": plan.start_line,
+        "angle_deg": g.angle_deg, "line_spacing_m": g.line_spacing_m,
         "side_overlap": g.side_overlap_actual, "photo_spacing_m": g.photo_spacing_m, "photos": g.photo_count,
         "total_s": plan.total_s, "flights": flights, "geojson": plan_geojson(plan), "notes": notes,
     }, missions, waypoints
@@ -227,6 +232,12 @@ def _save(req: dict, out_root: Path) -> tuple[dict, list[tuple[str, str, dict[st
     if not name:
         raise BadRequest("give the mission a name")
     resp, missions, waypoints = build_plan(req)
+    if resp["from_line"] > 1:
+        # Its own name, so it doesn't replace the whole survey's plans on the phone (FreeFlight
+        # plan folders are named from the mission name) and the app can't show a stale copy.
+        suffix = f"_from_line_{resp['from_line']}"
+        name = re.sub(r"_from_line_\d+$", "", name) + suffix
+        req = {**req, "name": name}
     home = LatLon(*resp["home"])
     out = out_root / name
     (out / "freeflight").mkdir(parents=True, exist_ok=True)
