@@ -16,7 +16,7 @@ from enum import IntEnum
 from typing import Sequence
 
 from .geo import LatLon, heading_deg
-from .grid import SurveyLine
+from .grid import MAX_SPEED_MS, MIN_SPEED_MS, SurveyLine
 
 HEADER = "QGC WPL 120"
 
@@ -112,8 +112,8 @@ def validate_mission(items: Sequence[MissionItem]) -> list[str]:
                 problems.append(f"item {i}: missing altitude (the drone silently rejects these)")
             if not (-90 <= it.x <= 90 and -180 <= it.y <= 180) or (it.x == 0 and it.y == 0):
                 problems.append(f"item {i}: invalid coordinates {it.x}, {it.y}")
-        if it.command == Cmd.DO_CHANGE_SPEED and not 1 <= it.p2 <= 10:
-            problems.append(f"item {i}: speed {it.p2} outside 1-10 m/s")
+        if it.command == Cmd.DO_CHANGE_SPEED and not MIN_SPEED_MS <= it.p2 <= MAX_SPEED_MS:
+            problems.append(f"item {i}: speed {it.p2} outside {MIN_SPEED_MS:g}-{MAX_SPEED_MS:g} m/s")
         if it.command == Cmd.DO_MOUNT_CONTROL and not -90 <= it.p1 <= 90:
             problems.append(f"item {i}: gimbal pitch {it.p1} outside -90..90")
         if it.command == Cmd.SET_STILL_CAPTURE_MODE and not it.p2 > 0:

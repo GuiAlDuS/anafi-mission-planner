@@ -123,3 +123,23 @@ def test_photo_period_must_be_positive():
     pts = [LatLon(9.983, -78.701), LatLon(9.984, -78.701)]
     with pytest.raises(ValueError):
         plan_files("Bad", pts, 60, 8, photo_period_s=0)
+
+
+def test_photo_plans_hold_one_heading_like_freeflight_resaves_it():
+    # FreeFlight keeps our yaws only with follow 0 (with follow 1 it recomputes them to face the
+    # next waypoint), and re-saves the first waypoint's yaw as 360 (iPhone test, 2026-11-09).
+    home = LatLon(9.9826, -78.7007)
+    pts = [LatLon(9.983, -78.701), LatLon(9.983, -78.700), LatLon(9.9832, -78.700), LatLon(9.9832, -78.701)]
+    _, files = plan_files("Heading", pts, 50, 5, date_s=1792855328, home=home, photo_period_s=2.2)
+    wps = json.loads(files["savedPlan.json"])["plan"]["wayPoints"]
+    assert all(w["follow"] == 0 for w in wps)
+    assert wps[0]["yaw"] == 360 and {round(w["yaw"]) for w in wps[1:]} == {90}  # line 1 runs east
+    yaws = [float(r[7]) for r in _rows(files["flightPlan.mavlink"].decode()) if r[3] == "16"]
+    assert yaws[0] == 360 and {round(y) for y in yaws[1:]} == {90}
+
+
+def test_video_plans_keep_freeflight_heading_rule():
+    pts = [LatLon(9.983, -78.701), LatLon(9.984, -78.701), LatLon(9.984, -78.700)]
+    _, files = plan_files("Video", pts, 60, 8, date_s=1792855328)
+    wps = json.loads(files["savedPlan.json"])["plan"]["wayPoints"]
+    assert all(w["follow"] == 1 for w in wps) and round(wps[0]["yaw"]) == 0 and round(wps[1]["yaw"]) == 90

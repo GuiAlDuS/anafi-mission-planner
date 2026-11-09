@@ -98,6 +98,16 @@ whatever the camera control said. Our plans carry:
   actions makes firmware 1.8.x hover instead of flying the plan.
 - In the app, these actions are in the plan's action menu: the button beside
   the plan list whose icon is a page with a "+".
+- **At least 2 s between photos** (planned 2.2 s, for jitter). The planner slows the survey down when
+  needed (see the [guide](guide.md)). Same rule as Jean-Charles Braun's
+  `qgc-to-ff6` converter (QGroundControl survey → `savedPlan.json`,
+  <https://gitlab.com/epysod12/qgc-to-ff6>, [tutorial](https://drone-est-captures.fr/wp-content/uploads/2026/10/qgc-to-ff6_tutoriel.pdf)), against
+  camera buffer overload and slow SD writes. Its tutorial gives FreeFlight's
+  plan limits as 2–150 m altitude and 1–11 m/s speed. It also says commands
+  are "sent to the drone in real time" and the link is essential; in the
+  simulator a plan kept flying after the link dropped (see
+  [simulator](simulator.md)), so that looks wrong, at least for plans our
+  program starts.
 - Reference: `tests/data/ff6_sim_photos.mavlink`, our plan as FreeFlight re-saved it.
 
 From the command line:
@@ -112,8 +122,16 @@ uv run anafi-drone freeflight pull -o freeflight_plans/     # copy all plans bac
 
 - FreeFlight's first speed item says 6 m/s in a plan whose waypoints say 5; we
   write the plan speed for both. Meaning unknown.
-- Each waypoint gets `follow: 1` like the app's own plans, which makes the
-  heading turn gradually between waypoints. Fine for nadir photos, untested.
+- **Photo plans hold one heading** (the first line's) for the whole flight,
+  written as `follow: 0` and the same `yaw` on every waypoint. Tested
+  2026-11-09: with `follow: 1` (the app's default) FreeFlight recomputes every
+  yaw to face the next waypoint when it re-saves the plan, and the drone then
+  turns gradually along each line toward the next one, so photos rotated up
+  to 90° within a line (simulator). With `follow: 0` FreeFlight kept our yaws
+  (iPhone re-save; it only sets the first waypoint to 360 and keeps view mode
+  1), and the drone flying that re-saved file held 86–90° on all 52 photos,
+  in the same time. The even lines are flown backwards, which doesn't matter
+  with the camera straight down. Video plans keep `follow: 1`.
 - Climb and descent are vertical over home: the plan's first waypoint is above
   home at survey altitude, and it ends above home at survey altitude, then at
   5 m (`END_ALTITUDE_M` in `planner/ff6.py`). Before 2026-11-02 plans started
@@ -124,3 +142,37 @@ uv run anafi-drone freeflight pull -o freeflight_plans/     # copy all plans bac
   return-home setting). Expect it to hover at 5 m above home and land it with
   the controller. The "At the end" setting in the planner only applies to our
   own `.mavlink` files.
+
+## Notes from drone-est-captures.fr
+
+Jean-Charles Braun flies photogrammetry with an Anafi 4K and writes about it
+(in French) at <https://drone-est-captures.fr/>. Useful for us, read 2026-11-09:
+
+- **Two photo modes.** Rectilinear JPEG: 4608 × 3456 (16 MP), 75.5° wide,
+  corrected by the firmware; this is what our camera model and plans use, and
+  what Pix4Dcapture took. Wide JPEG: 5344 × 4016 (21 MP), 84° wide, not
+  corrected. MAVLink plans (QGroundControl, our `.mavlink`) can only take
+  rectilinear photos; FreeFlight plans can take wide ones. He prefers wide
+  because the firmware's correction leaves some distortion that MicMac handles
+  poorly. WebODM did fine with our rectilinear photos, so we keep them
+  ([article](https://drone-est-captures.fr/2024/06/18/plan-de-vol-et-photogrammetrie-avec-anafi-qgc/)).
+- **At least 2 s between photos**: the rule our planner follows (see Camera,
+  above). He added it after a user's report of odd behaviour in flight.
+- **Fixed heading.** With the camera straight down he keeps the drone's
+  heading fixed for the whole plan, so it doesn't rotate at every waypoint:
+  "several seconds per waypoint". In the simulator (2026-11-09) it saved no
+  time with our plans, since the drone stops at every waypoint anyway, but it
+  matters for FreeFlight plans: with the app's default heading rule the drone
+  turned gradually along every line and photos rotated up to 90° within a
+  line, so our photo plans now hold one heading (see Known limits and
+  [simulator](simulator.md)).
+- **Decimal altitude and speed.** FreeFlight's plan screen only offers whole
+  numbers, but it keeps decimal values written in the file (`savedPlan.json`).
+- **Buying Flight Plan.** He reports (September 2026, ParrotPilots forum) that
+  FreeFlight 6's Follow Me and Flight Plan modes can no longer be bought. The
+  FreeFlight path only works on a phone that already has Flight Plan. His
+  alternative: QGroundControl's Android app flies the Anafi (rectilinear photos
+  only), tested by him.
+- **Ground control points** fix the "bowl" distortion of surveys that rely on
+  the photos' GPS only: six markers (four corners and two inside) measured with
+  differential GPS, for a 160 × 40 m site flown at 15 m ([article](https://drone-est-captures.fr/2023/04/16/reduire-les-ecarts-grace-aux-points-de-controle-gcp/)).

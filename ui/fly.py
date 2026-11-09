@@ -81,7 +81,8 @@ def _status_json(s: control.Status | None) -> dict | None:
         "plan_state": s.plan_state, "plan_available": s.plan_available,
         "mission_item": s.mission_item, "rth_state": s.rth_state, "alert": s.alert,
         "max_altitude_m": s.max_altitude_m, "max_distance_m": s.max_distance_m, "geofence": s.geofence,
-        "rth_delay_s": s.rth_delay_s,
+        "rth_delay_s": s.rth_delay_s, "rth_on_disconnect": s.rth_on_disconnect,
+        "rth_on_disconnect_fixed": s.rth_on_disconnect_fixed,
     }
 
 

@@ -12,7 +12,7 @@ from pathlib import Path
 from .analyze import analyze_directory
 from .estimate import FlightModel
 from .geo import LatLon
-from .grid import SurveySettings
+from .grid import MIN_PHOTO_INTERVAL_S, SurveySettings
 from .mavlink import format_mission, survey_mission, tiny_mission, validate_mission
 from .plan import plan_geojson, plan_survey
 from .runs import endurance_estimate, load_labels, read_runs, save_labels
@@ -53,7 +53,8 @@ def _mmss(seconds: float) -> str:
 
 def cmd_plan(args) -> int:
     settings = SurveySettings(altitude_m=args.alt, front_overlap=args.front / 100, side_overlap=args.side / 100,
-                              speed_ms=args.speed, angle_deg=args.angle, overshoot_m=args.overshoot)
+                              max_speed_ms=args.speed, angle_deg=args.angle, overshoot_m=args.overshoot,
+                              min_photo_interval_s=args.min_photo_interval)
     model = replace(FlightModel(), endurance_min=args.endurance, reserve_frac=args.reserve / 100)
     try:
         plan = plan_survey(read_polygon(args.area), parse_latlon(args.home), settings, model,
@@ -70,6 +71,9 @@ def cmd_plan(args) -> int:
         print(f"Starting at line {plan.start_line} of {plan.total_lines}: lines 1-{plan.start_line - 1} left out")
     print(f"Lines: {len(g.lines)} at {g.angle_deg:.1f} deg, spacing {g.line_spacing_m:.1f} m "
           f"(side overlap {g.side_overlap_actual:.0%}), photo every {g.photo_spacing_m:.1f} m, ~{g.photo_count} photos")
+    print(f"Speed {settings.speed_ms:.1f} m/s, a photo every {settings.photo_interval_s:.1f} s")
+    if note := settings.speed_note():
+        print(f"Note: {note}")
     print(f"Flights: {len(plan.flights)}, total {_mmss(plan.total_s)}")
     rc = 0
     for n, f in enumerate(plan.flights, 1):
@@ -172,7 +176,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--alt", type=float, default=120, help="altitude above takeoff (m)")
     p.add_argument("--front", type=float, default=80, help="front overlap (%%)")
     p.add_argument("--side", type=float, default=80, help="side overlap (%%)")
-    p.add_argument("--speed", type=float, default=10, help="survey speed (m/s, 1-10)")
+    p.add_argument("--speed", type=float, default=10, help="survey speed (m/s, 1-10); lowered if photos "
+                   "would be closer than --min-photo-interval")
+    p.add_argument("--min-photo-interval", type=float, default=MIN_PHOTO_INTERVAL_S,
+                   help=f"shortest time between photos (s, default {MIN_PHOTO_INTERVAL_S:g}; 0 = no limit)")
     p.add_argument("--angle", type=float, help="line heading (deg from north); default: fastest")
     p.add_argument("--overshoot", type=float, help="extend lines past the area (m); default: one photo spacing")
     p.add_argument("--end", choices=["rth", "land"], default="rth", help="end of mission action")

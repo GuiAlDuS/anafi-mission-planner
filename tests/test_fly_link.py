@@ -20,7 +20,7 @@ AREA = [LatLon(48.879590, 2.369737), LatLon(48.879590, 2.370417), LatLon(48.8799
 
 def _write_mission(out_root):
     home = LatLon(*HOME[:2])
-    plan = plan_survey(AREA, home, SurveySettings(altitude_m=25, speed_ms=5))
+    plan = plan_survey(AREA, home, SurveySettings(altitude_m=25, max_speed_ms=5))
     f = plan.flights[0]
     text = format_mission(survey_mission(f.lines, home, 25, 5, plan.grid.photo_spacing_m))
     (out_root / "sim").mkdir(parents=True)

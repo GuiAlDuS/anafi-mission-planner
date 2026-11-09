@@ -1,7 +1,7 @@
 "use strict";
 
 const $ = (id) => document.getElementById(id);
-const PARAMS = ["altitude", "speed", "front", "side", "angle-mode", "angle", "end", "endurance", "reserve"];
+const PARAMS = ["altitude", "speed", "front", "side", "photo_gap", "angle-mode", "angle", "end", "endurance", "reserve"];
 const CHOICES = ["altitude", "speed", "angle-mode"]; // radio groups; the rest are plain inputs
 const STORE = "anafi-planner.v1";
 const STATUS_WORDS = { ok: "fits", tight: "tight, no wind margin", exceeds: "too long for one battery" };
@@ -1137,7 +1137,8 @@ function renderPlan(p, error) {
   $("from_line").max = p.total_lines;
   const from = p.from_line > 1 ? ` Starting at line ${p.from_line} of ${p.total_lines}: lines 1–${p.from_line - 1} left out.` : "";
   $("summary").textContent = `${fmt(p.gsd_cm, 1)} cm per pixel. ${p.lines} lines, ${fmt(p.line_spacing_m, 1)} m apart `
-    + `(side overlap ${fmt(p.side_overlap * 100)}%). A photo every ${fmt(p.photo_spacing_m, 1)} m; `
+    + `(side overlap ${fmt(p.side_overlap * 100)}%). A photo every ${fmt(p.photo_spacing_m, 1)} m `
+    + `(${fmt(p.photo_interval_s, 1)} s at ${fmt(p.speed_ms, 1)} m/s${p.speed_lowered ? ", slowed down" : ""}); `
     + `each covers ${fmt(p.footprint_m[0])} × ${fmt(p.footprint_m[1])} m.${from}`;
   if (getParam("angle-mode") === "auto") {
     $("angle").placeholder = fmt(p.angle_deg % 180);
@@ -1247,7 +1248,7 @@ async function openMission(name) {
     if (state.area.length) rememberArea(); // Undo brings back what was on the map
     state.area = m.area;
     state.home = m.home || null;
-    for (const k of ["altitude", "speed", "front", "side", "end", "endurance", "reserve"]) {
+    for (const k of ["altitude", "speed", "front", "side", "photo_gap", "end", "endurance", "reserve"]) {
       if (m[k] !== undefined && m[k] !== null && m[k] !== "") setParam(k, m[k]);
     }
     setParam("angle-mode", m.angle === null || m.angle === undefined || m.angle === "" ? "auto" : "set");

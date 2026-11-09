@@ -291,3 +291,16 @@ def test_delete_mission_goes_to_the_trash(tmp_path):
     with pytest.raises(BadRequest, match="nothing was deleted"):
         delete_mission(tmp_path, "keep", trash=no_trash)
     assert (tmp_path / "keep" / "request.json").exists()
+
+
+def test_plan_slows_down_for_photo_interval(tmp_path):
+    req = {"area": AREA, "home": HOME, "altitude": "40", "speed": "10", "name": "low"}
+    resp, missions, _ = build_plan(req)
+    assert resp["speed_lowered"] and resp["photo_interval_s"] == pytest.approx(2.2)
+    assert any("Speed lowered" in n for n in resp["notes"])
+    speeds = [it.p2 for it in parse_mission(missions[0]) if it.command == 178]
+    assert speeds and all(v == pytest.approx(resp["speed_ms"], abs=0.01) for v in speeds)
+    # FreeFlight plan: same speed, time lapse every 2.2 s
+    save_plan(req, tmp_path)
+    off, _, _ = build_plan({**req, "photo_gap": "0"})
+    assert not off["speed_lowered"] and off["speed_ms"] == 10

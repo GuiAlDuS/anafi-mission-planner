@@ -13,7 +13,7 @@ releases Parrot supports.
 > for the Anafi 4K. Real drones are on 1.8.2. Results here are strong evidence,
 > not proof: still test on the real drone, with a tiny mission first.
 
-## Results so far (Sphinx 2.25.2, 2026-11-03 to 04)
+## Results so far (Sphinx 2.25.2, from 2026-11-03)
 
 | Test | Result |
 |---|---|
@@ -35,6 +35,11 @@ releases Parrot supports.
 | Live camera in the Fly tab | ✅ RTSP over UDP through the controller (TCP isn't answered), ffmpeg to 5 fps MJPEG, 640 px. The drone ends the stream when it switches camera modes during a survey; the relay restarts it |
 | Finish a survey from line 4 (GUI "Start at line", Send to FreeFlight), 40 m (2026-11-04) | ✅ saved as `sim_ff6_survey_from_line_4`; flew only lines 4–6, 26 photos at −90°, front/side overlap 80/84 %, clean stop at the last line |
 | Final FreeFlight layout: tilt at every line start, photos started once at line 1, stopped at the last line end | ✅ 114 photos, all at −90°, along all 8 lines, spacing 5.6 m (front 81 %), ~1 s hovers, no errors; about 3 min airborne |
+| Does the drone report "return home on disconnect during a flight plan" (`FlightPlanSettingsState.ReturnHomeOnDisconnectChanged`)? (2026-11-09, read only) | ❌ never sent, even after 5 s; Olympe also lists the message as unsupported. `status` shows "not reported". The `rth` feature reports a link-loss delay of 1 s (settable 1–120 s) but has no way to turn off return home on link loss. Not yet checked on the real drone (fw 1.8.2) |
+| **Fixed heading** (drone-est-captures.fr's tip), our `.mavlink`: 5 lines at 50 m, 5.8 m/s, same plan with waypoint yaws as now (face each line) vs all 90° (2026-11-09) | ➖ no time saved: 166.5 s both. The heading held (every photo at 90°; the normal plan's photos at 90/180/270°). The drone stops at every waypoint anyway and turns during the stop. Photo gaps: median 2.01 s at a planned 2.0 s, a few 1.5–1.8 s, hence the planner's 2.2 s default |
+| **Fixed heading, FreeFlight plans** (their `.mavlink` started from our program, 5 lines at 50 m, 5.3 m/s, time lapse 2.2 s) | ➖ no time saved: 182–187 s as written today (two runs), 186 s with a fixed heading. ❗ **As written today the drone turns along every line**: "continue" view mode (`50000` p1=1) turns it gradually from one waypoint's yaw to the next, and our line-end waypoint points to the next line, so the heading went 85° → 177° along line 1 and photos rotate up to 90° within a line. Fixed heading (absolute view mode, every yaw 90°): all 52 photos at 90°. Both took 52 photos at −90°, median gap 2.20 s (min 1.3–1.4 s) |
+| Fixed heading as FreeFlight re-saves it: plan with `follow: 0` and yaw 90° on every waypoint, opened and saved in FreeFlight on the iPhone, then its re-written `.mavlink` flown (2026-11-09) | ✅ FreeFlight kept the yaws (first waypoint set to 360, view mode still 1); 52 photos at 86–90° and −90° pitch, 187 s. With `follow: 1` FreeFlight recomputed the yaws to face each next waypoint. Now the default for photo plans (`planner/ff6.py`) |
+| **Link lost during a flight plan** (2026-11-09): survey at 50 m, link-loss delay 30 s, our program killed (no clean disconnect) 4 s into line 2, 66 m from home; true position from Sphinx's telemetry | ❗ **no return home**: the firmware logs `Piloting mode navigation doesn't request automatic returnhome` and the drone flew lines 2–5 as planned, all photos taken (GPS lapse every 2.9 s), then the plan's own end over home. The delay setting doesn't apply to flight plans. A first try at 25 m with a 60 s delay showed the same (40 s of the plan after the cut) and hit a tree at the end of line 3: in the mountains world, 25 m is too low at the lake's west side |
 | 7-line survey at 25 m, 5 m/s, distance-triggered photos (`50001`, `2000`/`2001`) | ✅ 63 photos in GPS-lapse mode, spacing 5.9 m (5.8 m planned), front/side overlap 80/83 % as planned, camera at −90°, 3:00 flown vs 3:20 estimated |
 
 What the simulator taught us:

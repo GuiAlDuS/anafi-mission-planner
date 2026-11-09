@@ -14,7 +14,8 @@ def test_format_status_before_gps_fix():
         "battery      74 %",
         "state        landed",
         "GPS          no fix, position unknown",
-        "home         unknown, type TAKEOFF, return home after 1 s link loss",
+        "home         unknown, type TAKEOFF",
+        "link loss    return home after 1 s; during a flight plan: not reported",
         "flight plan  NOT ready (GPS MISSING, Calibration ok, TakeOff ok); stopped",
         "limits       max altitude 150 m, max distance 100 m (geofence off)",
     ]
@@ -28,6 +29,14 @@ def test_format_status_ready_and_unknowns():
     assert "alert: power_level" in text
     assert "position 9.980000, -78.700000 (alt 1.5 m)" in text
     assert "flight plan  ready; playing abc" in text
+    assert "during a flight plan: not reported" in text
+
+
+def test_format_status_rth_on_disconnect():
+    s = Status(rth_delay_s=1, rth_on_disconnect=True, rth_on_disconnect_fixed=True)
+    assert "link loss    return home after 1 s; during a flight plan: return home (fixed)" in format_status(s)
+    s = Status(rth_on_disconnect=False, rth_on_disconnect_fixed=False)
+    assert "during a flight plan: keep flying the plan (settable)" in format_status(s)
 
 
 HOME = (9.9826743, -78.7006829, 0.0)

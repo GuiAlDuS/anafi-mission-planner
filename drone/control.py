@@ -42,6 +42,8 @@ class Status:
     max_distance_m: float | None = None
     geofence: bool | None = None  # True: the drone won't fly beyond max_distance_m
     rth_delay_s: int | None = None
+    rth_on_disconnect: bool | None = None  # during a flight plan; None: the drone didn't report it
+    rth_on_disconnect_fixed: bool | None = None  # True: read-only on this drone
     home_type: str | None = None
     alert: str | None = None
     altitude_m: float | None = None  # above takeoff
@@ -97,7 +99,7 @@ def connect(host: str = DRONE_HOST):
 def read_status(dev) -> Status:
     """Collect the drone's last reported state. Missing states stay None."""
     from olympe.messages.ardrone3 import GPSSettingsState, PilotingSettingsState, PilotingState
-    from olympe.messages.common import CommonState, FlightPlanState, MavlinkState
+    from olympe.messages.common import CommonState, FlightPlanSettingsState, FlightPlanState, MavlinkState
 
     def get(msg):
         try:
@@ -131,6 +133,10 @@ def read_status(dev) -> Status:
         s.geofence = bool(st["shouldNotFlyOver"])
     if st := get(GPSSettingsState.ReturnHomeDelayChanged):
         s.rth_delay_s = st["delay"]
+    # Olympe calls this message unsupported: the Anafi may never send it.
+    if st := get(FlightPlanSettingsState.ReturnHomeOnDisconnectChanged):
+        s.rth_on_disconnect = bool(st["state"])
+        s.rth_on_disconnect_fixed = bool(st["isReadOnly"])
     if st := get(GPSSettingsState.HomeTypeChanged):
         s.home_type = _enum_name(st["type"])
     if st := get(PilotingState.AlertStateChanged):
@@ -164,6 +170,13 @@ def _fmt_pos(p) -> str:
     return "unknown" if p is None else f"{p[0]:.6f}, {p[1]:.6f} (alt {p[2]:.1f} m)"
 
 
+def _fmt_rth_plan(s: Status) -> str:
+    if s.rth_on_disconnect is None:
+        return "not reported"
+    what = "return home" if s.rth_on_disconnect else "keep flying the plan"
+    return what + {True: " (fixed)", False: " (settable)", None: ""}[s.rth_on_disconnect_fixed]
+
+
 def format_status(s: Status) -> str:
     comps = ", ".join(f"{k} {'ok' if v else 'MISSING'}" for k, v in s.plan_components.items())
     plan = {True: "ready", False: "NOT ready", None: "?"}[s.plan_available]
@@ -173,7 +186,8 @@ def format_status(s: Status) -> str:
         f"state        {_fmt(s.flying_state)}" + (f", alert: {s.alert}" if s.alert not in (None, "none") else ""),
         f"GPS          {'fixed' if s.gps_fixed else 'no fix' if s.gps_fixed is False else '?'}"
         f", position {_fmt_pos(s.position)}",
-        f"home         {_fmt_pos(s.home)}, type {_fmt(s.home_type)}, return home after {_fmt(s.rth_delay_s, ' s')} link loss",
+        f"home         {_fmt_pos(s.home)}, type {_fmt(s.home_type)}",
+        f"link loss    return home after {_fmt(s.rth_delay_s, ' s')}; during a flight plan: {_fmt_rth_plan(s)}",
         f"flight plan  {plan}" + (f" ({comps})" if comps else "")
         + f"; {_fmt(s.plan_state)}" + (f" {s.plan_file}" if s.plan_file else ""),
         f"limits       max altitude {_fmt(s.max_altitude_m, ' m', '.0f')}, "

@@ -20,7 +20,7 @@ def test_settings_validation():
     with pytest.raises(ValueError):
         SurveySettings(front_overlap=1.0)
     with pytest.raises(ValueError):
-        SurveySettings(speed_ms=12)
+        SurveySettings(max_speed_ms=12)
 
 
 def test_rectangle_line_count_and_spacing(area):
@@ -123,3 +123,30 @@ def test_photo_points_match_count_and_spacing(area, home):
             assert abs(distance_m(a, b) - g.photo_spacing_m) < 0.5
     photos = [f for f in plan_geojson(plan)["features"] if f["properties"]["kind"] == "photos"]
     assert sum(len(f["geometry"]["coordinates"]) for f in photos) == g.photo_count
+
+
+def test_speed_lowered_to_keep_photos_two_seconds_apart():
+    # 25 m, 80 % front overlap: a photo every ~5.8 m, so at most ~2.6 m/s with the 2.2 s default.
+    s = SurveySettings(altitude_m=25, max_speed_ms=5)
+    assert s.speed_ms == pytest.approx(s.photo_spacing_m / 2.2)
+    assert s.photo_interval_s == pytest.approx(2.2)
+    assert s.speed_lowered and "Speed lowered from 5 to 2.6 m/s" in s.speed_note()
+
+
+def test_speed_kept_when_photos_far_enough_apart():
+    s = SurveySettings(altitude_m=120, max_speed_ms=10)  # ~28 m apart: 2.8 s (Pix4Dcapture flew 2.6 s)
+    assert s.speed_ms == 10 and not s.speed_lowered and s.speed_note() is None
+    assert s.photo_interval_s == pytest.approx(s.photo_spacing_m / 10) and s.photo_interval_s > 2
+
+
+def test_photo_interval_limit_can_be_changed_or_turned_off():
+    assert SurveySettings(altitude_m=25, max_speed_ms=5, min_photo_interval_s=0).speed_ms == 5
+    assert SurveySettings(altitude_m=50, max_speed_ms=10, min_photo_interval_s=3).photo_interval_s == pytest.approx(3.0)
+    with pytest.raises(ValueError):
+        SurveySettings(min_photo_interval_s=-1)
+
+
+def test_speed_never_below_drone_minimum():
+    s = SurveySettings(altitude_m=8, max_speed_ms=4)  # photos 1.9 m apart
+    assert s.speed_ms == 1.0
+    assert "even at the slowest speed" in s.speed_note()

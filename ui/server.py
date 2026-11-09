@@ -29,7 +29,7 @@ from planner.ff6 import plan_files, plan_zip
 from shapely.geometry import Point, Polygon
 
 from planner.geo import LatLon, LocalProjection, centroid
-from planner.grid import SurveySettings
+from planner.grid import MIN_PHOTO_INTERVAL_S, SurveySettings
 from planner.mavlink import format_mission, survey_mission, validate_mission
 from planner.plan import plan_geojson, plan_survey
 from planner.runs import LABELS_FILE, load_labels, read_run, save_labels
@@ -190,7 +190,8 @@ def build_plan(req: dict) -> tuple[dict, list[str], list[list[LatLon]]]:
     try:
         settings = SurveySettings(
             altitude_m=float(req.get("altitude", 120)), front_overlap=float(req.get("front", 80)) / 100,
-            side_overlap=float(req.get("side", 80)) / 100, speed_ms=float(req.get("speed", 10)),
+            side_overlap=float(req.get("side", 80)) / 100, max_speed_ms=float(req.get("speed", 10)),
+            min_photo_interval_s=float(req.get("photo_gap", MIN_PHOTO_INTERVAL_S)),
             angle_deg=None if req.get("angle") in (None, "") else float(req["angle"]))
         model = replace(FlightModel(), endurance_min=float(req.get("endurance", FlightModel.endurance_min)),
                         reserve_frac=float(req.get("reserve", FlightModel.reserve_frac * 100)) / 100)
@@ -200,6 +201,8 @@ def build_plan(req: dict) -> tuple[dict, list[str], list[list[LatLon]]]:
     if end not in ("rth", "land"):
         raise BadRequest("end must be 'rth' or 'land'")
 
+    if note := settings.speed_note():
+        notes.append(note)
     try:
         start_line = int(req.get("from_line") or 1)
         plan = plan_survey(area, home, settings, model, start_line=start_line)
@@ -225,6 +228,8 @@ def build_plan(req: dict) -> tuple[dict, list[str], list[list[LatLon]]]:
         "lines": len(g.lines), "total_lines": plan.total_lines, "from_line": plan.start_line,
         "angle_deg": g.angle_deg, "line_spacing_m": g.line_spacing_m,
         "side_overlap": g.side_overlap_actual, "photo_spacing_m": g.photo_spacing_m, "photos": g.photo_count,
+        "altitude_m": settings.altitude_m, "speed_ms": settings.speed_ms, "speed_lowered": settings.speed_lowered,
+        "photo_interval_s": settings.photo_interval_s,
         "total_s": plan.total_s, "flights": flights, "geojson": plan_geojson(plan), "notes": notes,
     }, missions, waypoints
 
@@ -245,9 +250,9 @@ def _save(req: dict, out_root: Path) -> tuple[dict, list[tuple[str, str, dict[st
     out = out_root / name
     (out / "freeflight").mkdir(parents=True, exist_ok=True)
     files, zips, plans = [], [], []
-    altitude, speed = float(req.get("altitude", 120)), float(req.get("speed", 10))
-    # FreeFlight plans take time-lapse photos: the interval that gives the planned spacing at survey speed.
-    photo_period = resp["photo_spacing_m"] / speed
+    # As build_plan checked them; the speed may be lower than the one chosen (photos kept apart).
+    # FreeFlight plans take time-lapse photos: the interval that gives the planned spacing at that speed.
+    altitude, speed, photo_period = resp["altitude_m"], resp["speed_ms"], resp["photo_interval_s"]
     for n, (text, points) in enumerate(zip(missions, waypoints), 1):
         p = out / f"flight_{n}.mavlink"
         p.write_text(text)

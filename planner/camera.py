@@ -43,6 +43,8 @@ class Camera:
         return self.image_width_px * g, self.image_height_px * g
 
 
+# The Anafi also has a wide 21 MP mode (5344 x 4016, 84 deg, not distortion-corrected), only
+# reachable from FreeFlight plans, not MAVLink (drone-est-captures.fr); we use rectilinear.
 # Measured from EXIF of 5 Pix4Dcapture flights (Anafi fw 1.8.2, rectilinear 16 MP mode):
 # FocalLength 4.0 mm, FocalPlaneXResolution 7439.143084 px/cm -> 1.344241 um pixels.
 ANAFI_4K = Camera(

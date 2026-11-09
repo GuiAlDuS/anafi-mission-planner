@@ -18,6 +18,20 @@ then every photo spacing; they're also in `plan.geojson` for QGIS). Hover a
 line for its heading, length and photo count, hover a flight in the list to
 highlight it, or press "Preview route" to watch a dot fly it.
 
+**Speed and time between photos:** photos are planned at least **2.2 s
+apart** (**Min. time between photos**): the 2 s rule below plus 10 %, because
+distance-triggered photos jitter and a few came 1.5–1.8 s apart in the
+simulator when 2.0 s was planned. The rule comes from Jean-Charles Braun's
+QGroundControl → FreeFlight 6 converter ([tutorial](https://drone-est-captures.fr/wp-content/uploads/2026/10/qgc-to-ff6_tutoriel.pdf), p. 6), which
+refuses shorter intervals to avoid overloading the camera's capture buffer
+and delayed writes to the SD card. Pix4Dcapture never went below 2.6 s on our
+drone. Not yet measured on the real camera. When the chosen speed would take them faster, the survey flies slower
+and a note says so, e.g. at 40 m and 80 % front overlap (a photo every 9.3 m)
+10 m/s becomes 4.2 m/s. The summary shows the speed flown and the time between
+photos. Both the `.mavlink` missions and the FreeFlight plans use it. Set the
+field to 0 to turn the limit off. Low surveys get slower, so they take longer:
+at 120 m the limit doesn't change anything.
+
 **Drawing and editing the area:** **Draw area**, then click the corners;
 Backspace removes the last one, and clicking the first corner, Enter or Esc
 closes the area. Afterwards drag a corner to move it, drag or click the yellow
@@ -185,6 +199,7 @@ uv run anafi-plan plan area.geojson --home "LAT,LON" --alt 120 --front 80 --side
 ```
 GSD 4.03 cm/px | footprint 186 x 139 m
 Lines: 9 at 90.0 deg, spacing 33.7 m (side overlap 82%), photo every 27.9 m, ~162 photos
+Speed 10.0 m/s, a photo every 2.8 s
 Flights: 2, total 15:40
   Flight 1: lines 1-5, 8:33, battery ~57% [ok], max 373 m from home
             takeoff_climb 51s, transit_out 42s, lines 271s, turns 52s, transit_back 27s, descent_land 70s
@@ -199,7 +214,8 @@ With the 15 min battery default this ~12 min survey takes two batteries: as
 one flight it would leave less than the 25 % reserve. One `flight_N.mavlink`
 per battery and a `plan.geojson` preview. `anafi-plan
 plan -h` lists all options: line heading, overshoot, end action (`rth` or
-`land`), battery endurance and reserve.
+`land`), battery endurance and reserve, and `--min-photo-interval` (default 2.2 s;
+the survey speed is lowered to keep photos that far apart, 0 = no limit).
 
 `--from-line N` flies only lines N to the end, to finish a survey after a
 takeover: the grid, its direction and the line numbers are the ones of the
@@ -334,7 +350,8 @@ uv run anafi-drone --host 192.168.53.1 status
 battery      73 %
 state        landed
 GPS          no fix, position unknown
-home         unknown, type TAKEOFF, return home after 1 s link loss
+home         unknown, type TAKEOFF
+link loss    return home after 1 s; during a flight plan: not reported
 flight plan  NOT ready (GPS MISSING, Calibration ok, TakeOff ok); stopped
 limits       max altitude 150 m, max distance 100 m (geofence off)
 ```

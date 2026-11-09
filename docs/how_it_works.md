@@ -14,7 +14,11 @@ Found while building this, on an Anafi 4K (fw 1.8.2), Skycontroller 3 (fw
   `olympe.SkyController3` for it (`olympe.SkyController` is the Skycontroller 4
   protocol). macOS has no RNDIS driver, so this link only works on Linux/Windows.
 - **The drone** forgets uploaded plans when switched off; a plan's UID is the
-  MD5 of the file; `Mavlink.Start` takes it as the file path.
+  MD5 of the file; `Mavlink.Start` takes it as the file path and needs a
+  calibrated drone, outdoor mode and a GPS fix. It silently rejects a mission
+  with waypoints lacking altitudes or with no waypoint (`16`) at all, so check
+  the file first when a start fails (`validate_mission`). While the
+  Skycontroller holds the drone, the drone refuses direct SDK connections.
 - **FreeFlight 6** keeps plans on the phone in
   `/Documents/.Contents/FlightPlan/<UUID>/` (`savedPlan.json`,
   `flightPlan.mavlink`, `screenshot.png`) and flight logs in
@@ -29,8 +33,12 @@ Found while building this, on an Anafi 4K (fw 1.8.2), Skycontroller 3 (fw
   feature: return-home altitude (`min_altitude`, 20-100 m; ours was 30 m, too
   low for hilly ground with trees, now 60 m), what it does on arrival (hovers
   2 m above home by default), auto return on low battery, home type, and the
-  link-loss delay (1 s). Return home after a lost link isn't optional on the
-  Anafi; FreeFlight has no switch for it.
+  link-loss delay (1 s, settable 1–120 s). Return home after a lost link isn't
+  optional on the Anafi; FreeFlight has no switch for it. **But it doesn't
+  happen during a flight plan:** in the simulator (fw 1.10.4, 2026-11-09) the
+  drone kept flying the plan to its end after the link dropped ("Piloting mode
+  navigation doesn't request automatic returnhome"). Our plans end over home,
+  so it comes back when the survey is done. Not yet confirmed on fw 1.8.2.
 
 ## Two ways to fly, two ways to take photos
 
@@ -46,6 +54,11 @@ different ways (all verified in the simulator, 2026-11-03/04):
 | Photos switched on/off | at every line start and end | once: on at line 1, off at the end of the last line (repeating them jams the camera) |
 | Camera tilt | `205`, absolute −90°, after the climb | `Tilt` (sent as `2800`), relative, at the first waypoint and every line start |
 | After a pause and resume | nothing lost: `fly` switches the photos back on for the rest of the paused line (and off at its end); later lines start their own | photos stay off for the rest of the plan: fly the rest with "Start at line" |
+| Heading | turns at each waypoint to face the next leg, held along each line | one heading for the whole plan (`follow: 0`); the app's default would turn the drone along every line |
+
+Both paths fly slow enough to keep photos at least 2.2 s apart (the 2 s
+rule of [qgc-to-ff6](freeflight_import.md#notes-from-drone-est-capturesfr),
+plus 10 % because the gaps jitter): the planner lowers the speed when needed.
 
 FreeFlight plans can't use GPS lapse: the only photo action seen in its plan
 files takes a time interval. The app's own camera control (photo/video, GPS
@@ -86,7 +99,8 @@ number, so re-sending replaces it. FreeFlight flies straight from waypoint to
 waypoint, the first one included, so the plan starts with a waypoint above
 home at survey altitude (vertical climb) and ends above home at survey
 altitude, then above home at 5 m (vertical descent). Land from there with the
-controller. Without them the drone climbs on a slant toward line 1 after
+controller. Photo plans keep the first line's heading on every waypoint
+(`follow: 0`); FreeFlight keeps it when it re-saves the plan. Without them the drone climbs on a slant toward line 1 after
 takeoff, as it did on the first field test.
 
 **Time model.** Each straight leg uses a trapezoidal speed profile and every

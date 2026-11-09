@@ -34,6 +34,9 @@ ways:
   point and comes straight down, over home or where it lands. It never changes
   altitude while travelling sideways, and a test checks every kind of mission
   for it.
+- **Photos the camera can keep up with:** the survey flies slower when needed
+  to keep photos at least 2.2 s apart, and FreeFlight plans hold one heading so
+  photos don't rotate along the lines.
 - **Send to FreeFlight 6** in one click, over the iPhone's USB cable (no iCloud).
 - **Your own imagery:** Esri satellite or OpenStreetMap, your own orthophotos
   (e.g. from WebODM) and WMS layers. Maps you've viewed work offline.
@@ -59,38 +62,27 @@ ways:
 
 ### Tested in Parrot's simulator
 
-Missions, uploads and flight control also run in [Parrot Sphinx](docs/simulator.md),
-which runs the Anafi's real firmware (1.10.4; real drones are on 1.8.2) in a 3D
-world:
+[Parrot Sphinx](docs/simulator.md) runs the Anafi's real firmware (1.10.4; real
+drones are on 1.8.2) in a 3D world. Both paths have flown full surveys there:
+vertical climb and descent over home, lines at the planned altitude, photos
+straight down at the planned spacing and overlap, flight time within the
+estimate. What it taught us:
 
-**Laptop path** (`anafi-drone fly`, our `.mavlink`, photos by distance):
+- **A lost link doesn't stop a mission.** With the controller gone, the drone
+  flies the rest of the plan and its ending over home; its "return home after
+  N s without link" setting only applies outside flight plans.
+- **Taking over with the sticks pauses the plan.** Resuming continues the route,
+  but on FreeFlight plans the drone doesn't restart the photos: finish with
+  "Start at line" instead. The laptop path restarts them itself.
+- **FreeFlight's default heading rotated the photos** up to 90° along each
+  line; plans now hold one heading (confirmed with FreeFlight on the iPhone).
+- **Photos come in a little irregular**: some gaps were 25 % shorter than
+  planned, hence the 2.2 s minimum.
+- It also caught a slanted climb in the test mission (the cause of the first
+  crash), a plan resuming from the ground, and photo commands that jam the
+  camera. All fixed.
 
-| Test | Result |
-|---|---|
-| Tiny mission: takeoff, vertical climb, one waypoint, land | ✅ flown end to end |
-| Pause, resume, stop, return home | ✅ each one does what `fly`'s keys promise |
-| 7-line survey with distance-triggered photos | ✅ 63 photos at the planned spacing and overlap, camera straight down, 3:00 flown vs 3:20 estimated |
-| Pause halfway along a line, then resume | ✅ `fly` switches the photos back on for the rest of the line: 72 photos, 9 on every line, none missed |
-
-**Phone path** (Send to FreeFlight, flown from FreeFlight 6, photos by time):
-
-| Test | Result |
-|---|---|
-| 8-line survey sent from the GUI | ✅ vertical climb and descent over home, lines at the planned altitude |
-| Camera set by the plan itself | ✅ tilts straight down and takes photos, whatever the app's camera control says: 114 photos at −90°, 81 % front overlap |
-| Taking over with the sticks | ✅ the plan pauses at once and you fly it; resume (play) carries on, but the drone doesn't restart the photos |
-| Finish the rest with "Start at line" | ✅ flies only the remaining lines with the same grid: lines 4–6, 26 photos |
-| Repeating photo commands in the plan, to restart photos after a resume | ❌ jams the camera (skipped lines, 20 s stalls), so plans start photos once |
-
-The full list, with what each test taught us, is in
-[docs/simulator.md](docs/simulator.md#results-so-far-sphinx-2252-2026-11-03-to-04).
-
-It caught problems before they reached a real drone: the tiny test mission
-climbed on a slant (the cause of the first crash), `fly` uploaded to the wrong
-address, FreeFlight plans filmed video with the camera level, and photos stayed
-off after a resume. All are fixed, except that FreeFlight plans still can't
-restart photos after a resume: "Start at line" is the way round it. See [docs/simulator.md](docs/simulator.md)
-to run it yourself.
+Every test and its result: [docs/simulator.md](docs/simulator.md).
 
 > **Help wanted.** The author's drone was damaged in the first field test, so
 > testing has stopped. If you have a working original Anafi, issues and pull
@@ -115,7 +107,7 @@ Planning runs anywhere Python does, macOS on Apple Silicon included.
 
 | For | You also need |
 |---|---|
-| FreeFlight path | an iPhone with FreeFlight 6; on the computer `libimobiledevice` and `usbmuxd` (tested on Linux) |
+| FreeFlight path | an iPhone with FreeFlight 6 and its Flight Plan mode (reportedly no longer sold since September 2026, so only if you already have it); on the computer `libimobiledevice` and `usbmuxd` (tested on Linux) |
 | Laptop path, pack and health checks | x86_64 Linux (Olympe has no other builds) |
 | The Fly tab's live camera | `ffmpeg` |
 | `anafi-plan analyze` | `exiftool` |
@@ -150,6 +142,9 @@ Photos are triggered by **time** here (every N seconds, from the planned
 spacing and speed); the laptop path below triggers them by **distance** (GPS
 lapse). [The two paths compared](docs/how_it_works.md#two-ways-to-fly-two-ways-to-take-photos).
 
+**Plans sent with an older version:** send them again. Plans sent before
+2026-11-09 turn the drone (and the photos) along every line.
+
 **If you take over:** pushing a stick pauses the plan and gives you control.
 Play resumes the route, but the drone doesn't restart the photos. Return home
 instead, then open the mission, set **Finish an interrupted survey → Start at
@@ -166,20 +161,19 @@ More: [map, drawing and editing](docs/guide.md#the-map) ·
 Plug the Skycontroller 3 into the computer with a USB **data** cable. The drone
 is reached through it.
 
-**In `anafi-gui`, the Fly tab:** connect (Skycontroller USB, drone Wi-Fi or
-another address), pick a saved mission and press **Load on the drone**, then
-**hold "Hold to take off" for 2 seconds** once every check is green. The map
-shows the route and the drone live with its flown track; the panel shows the
-battery against your minimum, altitude, speed, distance from home and which line
-it's on, and the drone's live camera if you want it (needs `ffmpeg`). **Return
-home** is always at the bottom, with Pause/Resume, Land and Stop plan; after a
-takeover with the sticks it offers to **refly the interrupted line** from its
-start. Landed before the end of the survey (battery swap, takeover), it
-offers **Continue from line N**: carry the drone back to the takeoff point and
-take off again. Takeoffs more than 10 m from the takeoff point are refused. The
-flight is held by `anafi-gui`, not the page: closing the browser
-doesn't touch it. If `anafi-gui` itself stops, the drone carries on or returns
-home by itself; the Skycontroller can always take over.
+**In `anafi-gui`, the Fly tab:** connect, pick a saved mission, press **Load on
+the drone**, then **hold "Hold to take off" for 2 seconds** once every check is
+green. You see the drone and its track on the map, battery against your
+minimum, altitude, speed, line progress and, with `ffmpeg`, the live camera.
+**Return home** is always on screen, with Pause/Resume, Land and Stop plan.
+
+- After a stick takeover it offers to **refly the interrupted line** from its start.
+- Landed before the end (battery swap, takeover), it offers **Continue from
+  line N**: carry the drone back to the takeoff point first. Takeoffs more than
+  10 m from it are refused.
+- The flight is held by `anafi-gui`, not the page: closing the browser doesn't
+  touch it, and if `anafi-gui` stops the drone carries on by itself. The
+  Skycontroller can always take over.
 
 ![The Fly tab, ready: mission on the drone, every check passed, hold to take off](docs/images/fly_ready.jpg)
 
@@ -278,8 +272,12 @@ More: [what each check reads](docs/guide.md#drone-health-check-after-a-crash-or-
 - After any impact, inspect the drone and run `anafi-drone health` before
   flying again.
 
-The drone's own failsafes (low battery and lost link return home) stay active,
-but they don't replace supervision.
+The drone's own failsafes stay active, but they don't replace supervision.
+**If the link drops during a mission, the drone doesn't come home at once:** it
+flies the rest of the mission and its ending over home (seen in the simulator,
+not yet on a real drone). Plan the whole area within reliable radio range, high
+enough to clear everything on the way, and check the plan before you start:
+you can't stop it until the link comes back.
 
 ## Documentation
 
@@ -295,11 +293,11 @@ but they don't replace supervision.
 
 ## Roadmap
 
-- Field test: a tiny mission, then a small survey with GPS lapse photos (help
-  wanted).
+- Field test on firmware 1.8.2: a tiny mission, then a small survey on each
+  path; check the lost-link behaviour, the held heading and the camera's real
+  minimum time between photos (help wanted).
 - FreeFlight 6 on Android, and iPhone transfer on macOS and Windows.
 - A standalone program: download, double-click, plan.
-- A Fly tab in the GUI.
 - Pack check without Olympe, so it works on macOS and Windows.
 
 ## References
@@ -310,6 +308,8 @@ but they don't replace supervision.
 - [Parrot web server upload API](https://developer.parrot.com/docs/webserver-api/module_upload.html)
 - [Parrot forum: flight plans with Olympe](https://forum.developer.parrot.com/t/flightplan-with-olympe/9541)
 - [anafi-ai-survival-kit](https://github.com/mgr098/anafi-ai-survival-kit)
+- [Drone Est Captures](https://drone-est-captures.fr/): Anafi photogrammetry in French, and the
+  [qgc-to-ff6](https://gitlab.com/epysod12/qgc-to-ff6) converter ([tutorial](https://drone-est-captures.fr/wp-content/uploads/2026/10/qgc-to-ff6_tutoriel.pdf))
 - [libimobiledevice](https://libimobiledevice.org/)
 
 ## Licence

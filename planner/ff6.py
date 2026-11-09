@@ -20,6 +20,15 @@ included, so a plan made of the survey lines alone climbs on a slant towards
 line 1 after takeoff (seen in the field, 2026-11-01). Given `home`, the route
 starts with a waypoint over home at survey altitude (vertical climb) and ends
 with home at survey altitude, then home low (vertical descent).
+
+Photo plans keep one heading (the first line's) for the whole flight: with
+`follow: 1` (the app's default) FreeFlight recomputes every yaw to face the
+next waypoint, and the drone turns gradually along each line toward the next
+line, so photos rotate up to 90 deg within a line (simulator, 2026-11-09).
+With `follow: 0` the app keeps our yaws; it re-saves the first waypoint's yaw
+as 360 and keeps view mode 1, and the drone then holds the heading (all 52
+photos at 86-90 deg in the simulator, flying the file FreeFlight re-wrote).
+Same flight time either way. Idea from drone-est-captures.fr.
 """
 
 from __future__ import annotations
@@ -34,6 +43,7 @@ import zlib
 from typing import Sequence
 
 from .geo import LatLon, distance_m, heading_deg
+from .grid import MAX_SPEED_MS, MIN_SPEED_MS
 
 ANAFI_PRODUCT_ID = 2324  # 0x0914, "Anafi" in FreeFlight's savedPlan.json
 END_ALTITUDE_M = 5.0  # last waypoint, over home: low enough to land from, above GPS altitude drift
@@ -116,10 +126,18 @@ def camera_actions(n_points: int, photo_period_s: float | None = None, first_lin
     return [], per_wp
 
 
+def _plan_yaws(points: Sequence[LatLon], fixed_yaw_deg: float | None) -> list[float]:
+    """Each waypoint's yaw: FreeFlight's face-the-next-one rule, or one fixed heading
+    (the first waypoint then says 360, as FreeFlight re-saves it)."""
+    if fixed_yaw_deg is None:
+        return _yaws(points)
+    return [360.0] + [fixed_yaw_deg % 360] * (len(points) - 1)
+
+
 def saved_plan(title: str, points: Sequence[LatLon], altitude_m: float | Sequence[float], speed_ms: float,
                plan_uuid: str, date_s: int, takeoff: list[dict] | None = None,
-               actions: list[list[dict]] | None = None) -> dict:
-    yaws = _yaws(points)
+               actions: list[list[dict]] | None = None, fixed_yaw_deg: float | None = None) -> dict:
+    yaws = _plan_yaws(points, fixed_yaw_deg)
     alts = _altitudes(points, altitude_m)
     if actions is None:
         takeoff, actions = camera_actions(len(points))
@@ -139,7 +157,7 @@ def saved_plan(title: str, points: Sequence[LatLon], altitude_m: float | Sequenc
             "continue": True,
             "altitude": alt,
             "followPoi": False,
-            "follow": 1,
+            "follow": 1 if fixed_yaw_deg is None else 0,  # 1: the app recomputes yaws to face the next waypoint
         })
     return {
         "product": "Anafi",
@@ -159,7 +177,8 @@ def saved_plan(title: str, points: Sequence[LatLon], altitude_m: float | Sequenc
 
 
 def flight_plan_mavlink(points: Sequence[LatLon], altitude_m: float | Sequence[float], speed_ms: float,
-                        takeoff: list[dict] | None = None, actions: list[list[dict]] | None = None) -> str:
+                        takeoff: list[dict] | None = None, actions: list[list[dict]] | None = None,
+                        fixed_yaw_deg: float | None = None) -> str:
     """The .mavlink FreeFlight generates for such a plan (same commands, frames and number format).
 
     Each waypoint's actions follow it, as FreeFlight writes them.
@@ -188,7 +207,7 @@ def flight_plan_mavlink(points: Sequence[LatLon], altitude_m: float | Sequence[f
     if actions is None:
         takeoff, actions = camera_actions(len(points))
     rows = [row(178, p2=speed_ms, p3=-1), *action_rows(takeoff or []), row(178, p2=speed_ms, p3=-1)]
-    for i, (p, yaw, alt) in enumerate(zip(points, _yaws(points), _altitudes(points, altitude_m))):
+    for i, (p, yaw, alt) in enumerate(zip(points, _plan_yaws(points, fixed_yaw_deg), _altitudes(points, altitude_m))):
         rows.append(row(16, p2=5, p4=yaw, x=p.lat, y=p.lon, z=alt))
         rows.extend(action_rows(actions[i]))
         if i == 0:
@@ -223,15 +242,17 @@ def plan_files(title: str, points: Sequence[LatLon], altitude_m: float, speed_ms
     if home is not None:
         points, alts = home_route(points, altitude_m, home)
         first, last = 1, len(points) - 3  # the survey points sit between the climb and the return
-    if not 1 <= speed_ms <= 10:
-        raise ValueError("speed must be 1-10 m/s")
+    if not MIN_SPEED_MS <= speed_ms <= MAX_SPEED_MS:
+        raise ValueError(f"speed must be {MIN_SPEED_MS:g}-{MAX_SPEED_MS:g} m/s")
     plan_uuid = plan_uuid or str(uuidlib.uuid4()).upper()
     date_s = int(time.time()) if date_s is None else date_s
     takeoff, actions = camera_actions(len(points), photo_period_s, first, last)
-    plan = saved_plan(title, points, alts, speed_ms, plan_uuid, date_s, takeoff, actions)
+    # Photo plans hold the first line's heading, so photos don't rotate along the lines.
+    fixed = heading_deg(points[first], points[first + 1]) if photo_period_s is not None else None
+    plan = saved_plan(title, points, alts, speed_ms, plan_uuid, date_s, takeoff, actions, fixed)
     return plan_uuid, {
         "savedPlan.json": json.dumps(plan, indent=2, separators=(",", " : ")).encode(),
-        "flightPlan.mavlink": flight_plan_mavlink(points, alts, speed_ms, takeoff, actions).encode(),
+        "flightPlan.mavlink": flight_plan_mavlink(points, alts, speed_ms, takeoff, actions, fixed).encode(),
         "screenshot.png": placeholder_png(),
     }
 

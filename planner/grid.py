@@ -13,25 +13,39 @@ from .camera import ANAFI_4K, Camera
 from .geo import LatLon, LocalProjection, centroid, distance_m, heading_deg
 
 
+MIN_PHOTO_INTERVAL_S = 2.2  # 2 s rule + 10 %: distance-triggered photos jitter (sim: 1.5-1.8 s gaps at a planned 2.0)
+MIN_SPEED_MS, MAX_SPEED_MS = 1.0, 10.0  # what Anafi flight plans accept
+
+
 @dataclass(frozen=True)
 class SurveySettings:
     altitude_m: float = 120.0
     front_overlap: float = 0.80
     side_overlap: float = 0.80
-    speed_ms: float = 10.0
+    # The speed asked for; `speed_ms` is the speed flown, lowered to keep photos apart.
+    max_speed_ms: float = 10.0
     camera: Camera = ANAFI_4K
     # Line heading in degrees from true north; None lets the planner choose.
     angle_deg: float | None = None
     # Extra distance flown past the area at each end of a line; None = one photo spacing.
     overshoot_m: float | None = None
+    # Shortest time between photos. The survey flies slower when needed (see speed_ms).
+    # 2 s is the rule of J.-C. Braun's qgc-to-ff6 converter, against camera buffer overload and
+    # slow writes to the SD card (tutorial, p. 6: https://drone-est-captures.fr/wp-content/uploads/2026/10/qgc-to-ff6_tutoriel.pdf);
+    # The default plans 2.2 s, since some gaps come out shorter than planned (simulator 2026-11-09:
+    # median 2.01 s, a few 1.5-1.8 s at a planned 2.0 s). Pix4Dcapture never went below 2.6 s on
+    # our drone. Not measured on the real camera. 0 = off.
+    min_photo_interval_s: float = MIN_PHOTO_INTERVAL_S
 
     def __post_init__(self):
         if not 0 <= self.front_overlap < 1 or not 0 <= self.side_overlap < 1:
             raise ValueError("overlaps must be fractions in [0, 1)")
         if self.altitude_m <= 0:
             raise ValueError("altitude must be positive")
-        if not 1 <= self.speed_ms <= 10:
-            raise ValueError("Anafi flight plans accept speeds of 1-10 m/s")
+        if not MIN_SPEED_MS <= self.max_speed_ms <= MAX_SPEED_MS:
+            raise ValueError(f"Anafi flight plans accept speeds of {MIN_SPEED_MS:g}-{MAX_SPEED_MS:g} m/s")
+        if not 0 <= self.min_photo_interval_s <= 30:
+            raise ValueError("the shortest time between photos must be 0-30 s")
 
     @property
     def footprint_across_m(self) -> float:
@@ -45,6 +59,36 @@ class SurveySettings:
     @property
     def photo_spacing_m(self) -> float:
         return self.footprint_along_m * (1 - self.front_overlap)
+
+    @property
+    def speed_ms(self) -> float:
+        """The speed flown: max_speed_ms, lowered so photos are at least
+        min_photo_interval_s apart (never below the drone's minimum)."""
+        if self.min_photo_interval_s <= 0:
+            return self.max_speed_ms
+        return max(MIN_SPEED_MS, min(self.max_speed_ms, self.photo_spacing_m / self.min_photo_interval_s))
+
+    @property
+    def speed_lowered(self) -> bool:
+        return self.speed_ms < self.max_speed_ms - 1e-9
+
+    @property
+    def photo_interval_s(self) -> float:
+        """Time between photos along a line at the speed flown."""
+        return self.photo_spacing_m / self.speed_ms
+
+    def speed_note(self) -> str | None:
+        """Why the survey flies slower than chosen, or why photos are still too close; None if neither."""
+        if self.min_photo_interval_s <= 0:
+            return None
+        gap = self.min_photo_interval_s
+        if self.photo_interval_s < gap - 1e-9:
+            return (f"Photos {self.photo_interval_s:.1f} s apart even at the slowest speed ({MIN_SPEED_MS:g} m/s), "
+                    f"under the {gap:g} s minimum: fly higher or lower the front overlap.")
+        if self.speed_lowered:
+            return (f"Speed lowered from {self.max_speed_ms:g} to {self.speed_ms:.1f} m/s so photos are at "
+                    f"least {gap:g} s apart (one every {self.photo_spacing_m:.1f} m).")
+        return None
 
     @property
     def max_line_spacing_m(self) -> float:
