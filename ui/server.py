@@ -149,6 +149,7 @@ def config(tiles: dict[str, TileSource] | None = None) -> dict:
         "speeds": SPEEDS_MS,
         "endurance_min": FlightModel.endurance_min,
         "reserve_pct": FlightModel.reserve_frac * 100,
+        "min_photo_interval_s": MIN_PHOTO_INTERVAL_S,
     }
 
 

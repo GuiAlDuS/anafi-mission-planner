@@ -136,7 +136,11 @@ ui/
   video.py          the Fly tab's live camera: ffmpeg from the drone's RTSP to MJPEG, on demand
   ortho.py          your orthophotos: store, metadata, map tiles (rio-tiler, optional)
   wms.py            WMS layers: read a service's layer list, fetch and cache tiles
-  static/           page, map and battery charts; Leaflet and fonts stored locally
+  static/           the page; Leaflet and fonts stored locally. Plain scripts sharing
+                    one scope, in load order: app.js (helpers, parameters, map),
+                    map_layers.js, map_route.js (drawing), map_tools.js (editing),
+                    plan_panel.js (plan, save, missions, iPhone), main.js (views,
+                    start), batteries.js, fly.js
 tests/              unit tests, including checks against real flights
 docs/               field test procedures, FreeFlight import, release checklist
 ```
@@ -145,10 +149,14 @@ docs/               field test procedures, FreeFlight import, release checklist
 
 ```bash
 uv run pytest
+uv run --with playwright==1.64.1 python scripts/check_gui.py   # the GUI in a headless browser
 ```
 
 The planner is checked against missions flown by Pix4Dcapture (line count,
 line spacing, photo spacing, duration) and against FreeFlight's own plan
 files. The upload client is tested against a fake drone web server, the
 iPhone transfer against a fake phone, and the log reader against synthetic
-flight logs.
+flight logs. `scripts/check_gui.py` runs the page itself: it starts the GUI
+with empty folders, draws an area, checks the plan and its notes, saves and
+reopens a mission and opens every tab, failing on any page error; its
+screenshots allow a before/after comparison.

@@ -40,8 +40,11 @@ to them instead of repeating them here.
   drone back over home on their own. They do; keep it that way.
 - **Launch the simulator only through `sim/anafi.sh`** (it passes
   `wifi_iface=`); a bare `sphinx` takes the PC's Wi-Fi card.
-- **After editing `ui/static/*.js`, check the page in a headless browser**
-  (page errors, route drawn): unit tests don't run the JavaScript.
+- **After editing `ui/static/*.js`, run `scripts/check_gui.py`** (headless
+  browser: plan, route, notes, save and reopen, tabs, page errors): unit tests
+  don't run the JavaScript. The planner's scripts share one scope and load in
+  order (see the top of `ui/static/app.js`): load-time code may only use names
+  from its own file or earlier ones.
 - Test every new mission feature on a tiny mission (and in the simulator) first.
 
 ## Where things are documented
@@ -60,7 +63,8 @@ to them instead of repeating them here.
 
 ## Development
 
-- `uv sync --all-extras`, then `uv run pytest`. Python is pinned to 3.12
+- `uv sync --all-extras`, then `uv run pytest`; GUI changes also
+  `uv run --with playwright==1.64.1 python scripts/check_gui.py`. Python is pinned to 3.12
   (Olympe breaks on 3.13). Extras: `fly` (Olympe, x86_64 Linux), `ortho`
   (rio-tiler).
 - CLIs: `anafi-plan`, `anafi-drone`, `anafi-gui`.
