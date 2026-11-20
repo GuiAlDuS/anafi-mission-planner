@@ -36,10 +36,10 @@ publish before section 1 is done.
 
 ### iPhone
 
-- [ ] Replace the `afcclient` calls in `drone/iphone.py` with
-      [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) (pure
-      Python): one code path for Linux, macOS and Windows, no system packages.
-      Windows needs Apple's device drivers (iTunes or Apple Devices app).
+- [x] [pymobiledevice3](https://github.com/doronz88/pymobiledevice3) (pure
+      Python, `iphone` extra) in `drone/iphone.py`, with `afcclient` as the
+      fallback: Linux, macOS and Windows. Windows needs Apple's device drivers
+      (iTunes or Apple Devices app).
 - [ ] Test on macOS and Windows: list, send, pull-runs.
 - [ ] Test with a fresh iPhone that has never trusted the computer.
 
@@ -168,6 +168,8 @@ a Mac, Windows or only a phone.
 - [ ] Choose a licence: BSD-3-Clause matches Olympe; MIT is also fine.
 - [ ] Third-party notices: Leaflet (BSD-2) and Barlow (OFL) are vendored with
       their licences; libimobiledevice / pymobiledevice3 are called, not shipped.
+      pymobiledevice3 is GPL-3.0-or-later: bundling it in a packaged build
+      makes that build GPL-3.0.
 - [ ] Safety and liability notice in the README and the GUI's first run:
       experimental software flying a real aircraft, follow local rules, keep
       the Skycontroller in hand.
