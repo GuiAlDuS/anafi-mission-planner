@@ -96,7 +96,7 @@ $("clear").addEventListener("click", () => {
 });
 
 map.on("click", (e) => {
-  const p = [e.latlng.lat, e.latlng.lng];
+  const p = toPoint(e.latlng);
   if (state.mode === "drawing") { state.area.push(p); drawArea(); }
   else if (state.mode === "home") { state.home = p; drawHome(); setMode("idle"); replanSoon(); }
 });
