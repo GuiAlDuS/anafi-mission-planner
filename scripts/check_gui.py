@@ -135,6 +135,35 @@ def main() -> int:
             check(page.input_value("#photo_gap") == "3", "reopening restores the mission's settings")
             page.screenshot(path=shots / "3_reopened.png")
 
+            # Leaflet repeats the world sideways: an area drawn on a copy (longitude off by 360)
+            # must still plan, both when drawn there and when restored from a saved session.
+            page.click("#clear")
+            page.evaluate(f"map.setView([{VIEW[0]}, {VIEW[1] - 360}], {VIEW[2]})")
+            page.wait_for_timeout(800)
+            page.click("#draw")
+            for dx, dy in CORNERS:
+                page.mouse.click(cx + dx, cy + dy)
+                page.wait_for_timeout(200)
+            page.click("#draw")
+            page.wait_for_timeout(300)
+            page.mouse.click(cx, cy + 130)
+            page.wait_for_timeout(2500)
+            lngs = page.evaluate("state.area.map((p) => p[1]).concat(state.home ? [state.home[1]] : [])")
+            check(all(-180 <= x <= 180 for x in lngs), f"points drawn on a world copy are wrapped ({lngs[0]:.4f})")
+            readout = " ".join(page.locator("#readout").inner_text().split())
+            check("flight time" in readout, f"area drawn on a world copy plans: {readout}")
+            page.evaluate("""() => {
+                const s = JSON.parse(localStorage.getItem(STORE));
+                s.area = s.area.map(([a, b]) => [a, b - 360]);
+                s.home = [s.home[0], s.home[1] - 360];
+                s.view = [s.view[0], s.view[1] - 360, s.view[2]];
+                localStorage.setItem(STORE, JSON.stringify(s));
+            }""")
+            page.reload()
+            page.wait_for_timeout(3000)
+            readout = " ".join(page.locator("#readout").inner_text().split())
+            check("flight time" in readout, f"saved session on a world copy plans after reload: {readout}")
+
             # The other tabs.
             for view in ("batteries", "fly", "plan"):
                 page.evaluate(f"location.hash = '#{view}'")
