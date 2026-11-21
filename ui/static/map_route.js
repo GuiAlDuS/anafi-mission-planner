@@ -66,7 +66,7 @@ function drawArea() {
     const m = L.marker(p, { icon: vertexIcon(i === 0 && state.mode === "drawing"), draggable: true, keyboard: false,
       zIndexOffset: 900, title: closed ? "Drag to move; double-click or right-click to remove" : "" });
     m.on("dragstart", () => { rememberArea(); mids.forEach((mm) => mm.remove()); });
-    m.on("drag", (e) => { state.area[i] = [e.latlng.lat, e.latlng.lng]; reshape(); });
+    m.on("drag", (e) => { state.area[i] = toPoint(e.latlng); reshape(); });
     m.on("dragend", () => { drawArea(); replanSoon(); });
     m.on("click", () => {
       if (state.mode === "drawing" && i === 0 && pts.length >= 3) finishDrawing();
@@ -88,11 +88,10 @@ function drawArea() {
       added = true;
     };
     h.on("dragstart", (e) => {
-      const ll = e.target.getLatLng();
-      add([ll.lat, ll.lng]);
+      add(toPoint(e.target.getLatLng()));
       mids.filter((mm) => mm !== h).forEach((mm) => mm.remove());
     });
-    h.on("drag", (e) => { state.area[i + 1] = [e.latlng.lat, e.latlng.lng]; reshape(); });
+    h.on("drag", (e) => { state.area[i + 1] = toPoint(e.latlng); reshape(); });
     h.on("dragend", () => { drawArea(); replanSoon(); });
     h.on("click", (e) => {
       L.DomEvent.stop(e);
@@ -111,8 +110,7 @@ function drawHome() {
   homeMarker = L.marker(state.home, { icon: homeIcon, draggable: true, zIndexOffset: 1000 });
   if (document.body.dataset.view !== "fly") homeMarker.addTo(map); // Fly shows the flown mission's home
   homeMarker.on("dragend", (e) => {
-    const ll = e.target.getLatLng();
-    state.home = [ll.lat, ll.lng];
+    state.home = toPoint(e.target.getLatLng());
     replanSoon();
   });
 }
