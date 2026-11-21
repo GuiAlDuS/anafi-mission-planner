@@ -99,6 +99,7 @@ You need [uv](https://docs.astral.sh/uv/); it installs the right Python for you.
 git clone https://github.com/GuiAlDuS/anafi-mission-planner.git
 cd anafi-mission-planner
 uv sync               # planning, GUI, FreeFlight transfer, battery logs
+uv sync --extra iphone  # + iPhone transfer on Windows, macOS or Linux
 uv sync --all-extras  # also your own orthophotos, and on x86_64 Linux the
                       # flight control and pack check (Olympe)
 ```
@@ -107,7 +108,7 @@ Planning runs anywhere Python does, macOS on Apple Silicon included.
 
 | For | You also need |
 |---|---|
-| FreeFlight path | an iPhone with FreeFlight 6 and its Flight Plan mode (reportedly no longer sold since September 2026, so only if you already have it); on the computer `libimobiledevice` and `usbmuxd` (tested on Linux) |
+| FreeFlight path | an iPhone with FreeFlight 6 and its Flight Plan mode (reportedly no longer sold since September 2026, so only if you already have it); on the computer either the `iphone` extra (`uv sync --extra iphone`; on Windows also iTunes or the Apple Devices app for Apple's USB drivers) or, on Linux, `libimobiledevice` and `usbmuxd` |
 | Laptop path, pack and health checks | x86_64 Linux (Olympe has no other builds) |
 | The Fly tab's live camera | `ffmpeg` |
 | `anafi-plan analyze` | `exiftool` |
@@ -296,7 +297,7 @@ you can't stop it until the link comes back.
 - Field test on firmware 1.8.2: a tiny mission, then a small survey on each
   path; check the lost-link behaviour, the held heading and the camera's real
   minimum time between photos (help wanted).
-- FreeFlight 6 on Android, and iPhone transfer on macOS and Windows.
+- FreeFlight 6 on Android; field-test the iPhone transfer on macOS and Windows.
 - A standalone program: download, double-click, plan.
 - Pack check without Olympe, so it works on macOS and Windows.
 

@@ -45,9 +45,12 @@ Tracked in [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md), section 4, in this orde
    "Open data folder" button.
 2. **Errors in tile requests** must come back as an error response, never a
    dropped connection (seen in the trial when orthophoto tiles failed).
-3. **iPhone transfer inside the app:** replace the `afcclient` calls in
-   `drone/iphone.py` with `pymobiledevice3` (pure Python). Windows still needs
-   Apple's device drivers (iTunes or the Apple Devices app).
+3. **iPhone transfer inside the app:** `drone/iphone.py` now uses
+   `pymobiledevice3` (pure Python, the `iphone` extra) when installed and falls
+   back to `afcclient`. Windows still needs Apple's device drivers (iTunes or
+   the Apple Devices app). **Licence:** pymobiledevice3 is GPL-3.0-or-later;
+   a packaged program that bundles it must be distributed under GPL-3.0
+   terms, so decide that before shipping it inside a build.
 4. **Own window (optional):** `pywebview` shows the planner in an application
    window instead of a browser tab; closing it quits the server.
 5. **Automatic builds:** a GitHub Actions workflow builds Windows, macOS (Apple

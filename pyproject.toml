@@ -27,6 +27,12 @@ ortho = [
     "rio-tiler>=7",
 ]
 
+# Send plans to FreeFlight 6 on an iPhone from Linux, macOS or Windows (pure Python).
+# Windows also needs Apple's device drivers: iTunes or the Apple Devices app.
+iphone = [
+    "pymobiledevice3>=11.61,<12",
+]
+
 [project.scripts]
 anafi-plan = "planner.__main__:main"
 anafi-drone = "drone.__main__:main"

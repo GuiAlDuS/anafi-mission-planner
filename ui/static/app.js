@@ -49,12 +49,19 @@ function syncAngleMode() {
 // ---------- state ----------
 const state = { area: [], home: null, mode: "idle", plan: null, view: null };
 
+// Leaflet repeats the world sideways; a point clicked on a copy has its longitude off by
+// multiples of 360 (e.g. -482.6 for -122.6), which the server rejects. Keep every stored
+// point on the original world.
+const wrapLng = (lng) => ((((lng + 180) % 360) + 360) % 360) - 180;
+const toPoint = (ll) => [ll.lat, wrapLng(ll.lng)];
+const wrapPoint = (p) => [p[0], wrapLng(p[1])];
+
 function loadState() {
   try {
     const s = JSON.parse(localStorage.getItem(STORE) || "{}");
-    state.area = s.area || [];
-    state.home = s.home || null;
-    state.view = s.view || null;
+    state.area = (s.area || []).map(wrapPoint);
+    state.home = s.home ? wrapPoint(s.home) : null;
+    state.view = s.view ? [s.view[0], wrapLng(s.view[1]), s.view[2]] : null;
     if (typeof s.showPhotos === "boolean") $("show-photos").checked = s.showPhotos;
     // 21 min was the default before the flight logs showed today's batteries last about 15.
     if (s.params && String(s.params.endurance) === "21") delete s.params.endurance;
@@ -74,6 +81,8 @@ function saveState() {
 }
 
 // ---------- map ----------
-const map = L.map("map", { zoomControl: true, attributionControl: true });
+// worldCopyJump: panning onto a copy of the world jumps back to the original, so drawn
+// areas and markers stay visible and clicks give longitudes in -180..180.
+const map = L.map("map", { zoomControl: true, attributionControl: true, worldCopyJump: true });
 map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
 L.control.scale({ imperial: false, position: "bottomright" }).addTo(map);
