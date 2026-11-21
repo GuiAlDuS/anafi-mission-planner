@@ -40,7 +40,9 @@ publish before section 1 is done.
       Python, `iphone` extra) in `drone/iphone.py`, with `afcclient` as the
       fallback: Linux, macOS and Windows. Windows needs Apple's device drivers
       (iTunes or Apple Devices app).
-- [ ] Test on macOS and Windows: list, send, pull-runs.
+- [ ] Test on macOS and Windows: list, send, pull-runs. Windows 2026-11-21:
+      send works (pymobiledevice3, Apple drivers; the plan opens in
+      FreeFlight 6 with its waypoints); pull-runs not tried yet. macOS untested.
 - [ ] Test with a fresh iPhone that has never trusted the computer.
 
 ### Android (test with the old Android phone)
